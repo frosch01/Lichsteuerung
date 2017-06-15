@@ -1,5 +1,7 @@
 #!/bin/bash
 
+PINS="1 4 5 6 26 27 28 29"
+
 function finish {
   for PIN in $PINS; do
     gpio mode $PIN tri
@@ -9,8 +11,6 @@ function finish {
 }
 
 trap finish EXIT
-
-PINS="1 4 5 6 26 27 28 29"
 
 for PIN in $PINS; do 
   gpio mode $PIN tri
