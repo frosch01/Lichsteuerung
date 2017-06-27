@@ -57,10 +57,9 @@ class MyGPIO(GPIO):
         self.pullUpDnControl(MyGPIO.inputPins,  GPIO.PUD_DOWN)
         self.pullUpDnControl(MyGPIO.pwmPins,  GPIO.PUD_DOWN)
         
-gpio=MyGPIO(MyGPIO.WPI_MODE_PINS);
-
 class LightControl(object):    
     def __init__(self, gpio):
+        self.gpio = gpio
         self.trigger = [False for x in range(Trigger.MAX_TRIGGER)]
         gpio.registerIsr(Trigger.MOTION_SENSE_SOUTH,   lambda: self.MotionSensSouthTrigger())
         gpio.registerIsr(Trigger.MOTION_SENSE_NORTH,   lambda: self.MotionSensNorthTrigger())
@@ -69,20 +68,21 @@ class LightControl(object):
     def MotionSensSouthTrigger(self):
         print("MOTION_SENSE_SOUTH triggered")
         self.trigger[Trigger.MOTION_SENSE_SOUTH]   = True
-        gpio.digitalWrite(MyGPIO.relaisPins, GPIO.LOW)
+        self.gpio.digitalWrite(MyGPIO.relaisPins, GPIO.LOW)
     def MotionSensTerraceTrigger(self):
         print("MotionSensTerrace triggered")
         self.trigger[Trigger.MOTION_SENSE_TERRACE] = True
-        gpio.digitalWrite(MyGPIO.relaisPins, GPIO.LOW)
+        self.gpio.digitalWrite(MyGPIO.relaisPins, GPIO.LOW)
     def MotionSensNorthTrigger(self):
         print("MotionSenseNorth triggered")
         self.trigger[Trigger.MOTION_SENSE_NORTH]   = True
-        gpio.digitalWrite(MyGPIO.relaisPins, GPIO.LOW)
+        self.gpio.digitalWrite(MyGPIO.relaisPins, GPIO.LOW)
     def SpareTrigger(self):
         print("Spare triggered")
         self.trigger[Trigger.UNUSED_SENSE_]        = True
-        gpio.digitalWrite(MyGPIO.relaisPins, GPIO.LOW)
+        self.gpio.digitalWrite(MyGPIO.relaisPins, GPIO.LOW)
         
+gpio=MyGPIO(MyGPIO.WPI_MODE_PINS);
 lightControl = LightControl(gpio);
 
 def shutdown():
