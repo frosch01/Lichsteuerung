@@ -45,6 +45,9 @@ class MyGPIO(GPIO):
     def digitalWrite(self, pins, *args):
         self.IterateCall(super(MyGPIO, self).digitalWrite, pins, *args)
         
+    def registerIsr(self, input, func):
+        self.wiringPiISR(MyGPIO.inputPins[input], GPIO.INT_EDGE_FALLING, func)
+        
     def relaisTest(self):
         self.digitalWrite(MyGPIO.relaisPins, GPIO.LOW)
         time.sleep(1)
@@ -59,46 +62,36 @@ class MyGPIO(GPIO):
         self.pullUpDnControl(MyGPIO.inputPins,  GPIO.PUD_DOWN)
         self.pullUpDnControl(MyGPIO.pwmPins,  GPIO.PUD_DOWN)
         
+gpio=MyGPIO(MyGPIO.WPI_MODE_PINS);
+
 class LightControl(object):
     
-    def __init__(self):
-        trigger = [False for x in range(Trigger.MAX_TRIGGER)]
+    def __init__(self, gpio):
+        self.trigger = [False for x in range(Trigger.MAX_TRIGGER)]
+        gpio.registerIsr(Trigger.MOTION_SENSE_SOUTH,   lambda: self.MotionSensSouthTrigger())
+        gpio.registerIsr(Trigger.MOTION_SENSE_NORTH,   lambda: self.MotionSensNorthTrigger())
+        gpio.registerIsr(Trigger.MOTION_SENSE_TERRACE, lambda: self.MotionSensTerraceTrigger())
+        gpio.registerIsr(Trigger.UNUSED_SENSE_,        lambda: self.SpareTrigger())
     
     def MotionSensSouthTrigger(self):
-        trigger[Trigger.MOTION_SENSE_SOUTH]   = True
+        print("MOTION_SENSE_SOUTH triggered")
+        self.trigger[Trigger.MOTION_SENSE_SOUTH]   = True
+        gpio.digitalWrite(MyGPIO.relaisPins, GPIO.LOW)
     def MotionSensTerraceTrigger(self):
-        trigger[Trigger.MOTION_SENSE_TERRACE] = True
-    def MotionSenseNothTrigger(self):
-        trigger[Trigger.MOTION_SENSE_NORTH]   = True
+        print("MotionSensTerrace triggered")
+        self.trigger[Trigger.MOTION_SENSE_TERRACE] = True
+        gpio.digitalWrite(MyGPIO.relaisPins, GPIO.LOW)
+    def MotionSensNorthTrigger(self):
+        print("MotionSenseNorth triggered")
+        self.trigger[Trigger.MOTION_SENSE_NORTH]   = True
+        gpio.digitalWrite(MyGPIO.relaisPins, GPIO.LOW)
     def SpareTrigger(self):
-        trigger[Trigger.UNUSED_SENSE_]        = True
+        print("Spare triggered")
+        self.trigger[Trigger.UNUSED_SENSE_]        = True
+        gpio.digitalWrite(MyGPIO.relaisPins, GPIO.LOW)
         
-trigger=[False, False, False, False]
-gpio=MyGPIO(MyGPIO.WPI_MODE_PINS);
-lightControl = LightControl();
+lightControl = LightControl(gpio);
 
-def CallbackIsrIn0():
-    print("Input 0 triggered")
-    gpio.digitalWrite(MyGPIO.relaisPins, GPIO.LOW)
-    lightControl.MotionSensSouthTrigger()
-    trigger[0]=True
-    
-def CallbackIsrIn1():
-    print("Input 1 triggered")
-    gpio.digitalWrite(MyGPIO.relaisPins, GPIO.LOW)
-    lightControl.MotionSensTerraceTrigger()
-    trigger[1]=True
-def CallbackIsrIn2():
-    print("Input 2 triggered")
-    gpio.digitalWrite(MyGPIO.relaisPins, GPIO.LOW)
-    lightControl.MotionSenseNothTrigger()
-    trigger[2]=True
-def CallbackIsrIn3():
-    print("Input 3 triggered")
-    gpio.digitalWrite(MyGPIO.relaisPins, GPIO.LOW)
-    lightControl.SpareTrigger()
-    trigger[3]=True
-    
 def shutdown():
     print("Lichsteuerung terminating...", )
     gpio.cleanup()
@@ -107,20 +100,17 @@ def shutdown():
 if __name__ == "__main__":
     
     atexit.register(shutdown)
-         
-    gpio.wiringPiISR(MyGPIO.inputPins[0], GPIO.INT_EDGE_FALLING, CallbackIsrIn0)
-    gpio.wiringPiISR(MyGPIO.inputPins[1], GPIO.INT_EDGE_FALLING, CallbackIsrIn1)
-    gpio.wiringPiISR(MyGPIO.inputPins[2], GPIO.INT_EDGE_FALLING, CallbackIsrIn2)
-    gpio.wiringPiISR(MyGPIO.inputPins[3], GPIO.INT_EDGE_FALLING, CallbackIsrIn3)
-    
     gpio.relaisTest()
-    
+
     timer=0
     while True:
-        print(timer, " ", trigger)
+        print(timer)
         time.sleep(1)
-        if trigger[0] or trigger[1] or trigger[2] or trigger[3]:
-            trigger=[False, False, False, False]
+        if lightControl.trigger[Trigger.MOTION_SENSE_SOUTH] or \
+           lightControl.trigger[Trigger.MOTION_SENSE_NORTH] or \
+           lightControl.trigger[Trigger.MOTION_SENSE_TERRACE] or \
+           lightControl.trigger[Trigger.UNUSED_SENSE_]:
+            lightControl.trigger = [False for x in range(Trigger.MAX_TRIGGER)]
             timer=5
             
         if timer != 0:
