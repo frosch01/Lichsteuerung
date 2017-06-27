@@ -30,30 +30,25 @@ class MyGPIO(GPIO):
         self.pinMode(MyGPIO.inputPins, GPIO.INPUT)
         self.pullUpDnControl(MyGPIO.relaisPins, GPIO.PUD_OFF)
         self.pullUpDnControl(MyGPIO.inputPins, GPIO.PUD_OFF)
-        
     def IterateCall(self, call, pins, *args):
         try:
             for pin in pins:
                 call(pin, *args)
         except TypeError:
             call(pins, *args)
-            
     def pullUpDnControl(self, pins, *args):
         self.IterateCall(super(MyGPIO, self).pullUpDnControl, pins, *args)
     def pinMode(self, pins, *args):
         self.IterateCall(super(MyGPIO, self).pinMode, pins, *args)
     def digitalWrite(self, pins, *args):
         self.IterateCall(super(MyGPIO, self).digitalWrite, pins, *args)
-        
     def registerIsr(self, input, func):
         self.wiringPiISR(MyGPIO.inputPins[input], GPIO.INT_EDGE_FALLING, func)
-        
     def relaisTest(self):
         self.digitalWrite(MyGPIO.relaisPins, GPIO.LOW)
         time.sleep(1)
         self.digitalWrite(MyGPIO.relaisPins, GPIO.HIGH)
         time.sleep(1)
-        
     def cleanup(self):
         self.pinMode(MyGPIO.relaisPins, GPIO.INPUT)
         self.pinMode(MyGPIO.inputPins,  GPIO.INPUT)
@@ -64,15 +59,13 @@ class MyGPIO(GPIO):
         
 gpio=MyGPIO(MyGPIO.WPI_MODE_PINS);
 
-class LightControl(object):
-    
+class LightControl(object):    
     def __init__(self, gpio):
         self.trigger = [False for x in range(Trigger.MAX_TRIGGER)]
         gpio.registerIsr(Trigger.MOTION_SENSE_SOUTH,   lambda: self.MotionSensSouthTrigger())
         gpio.registerIsr(Trigger.MOTION_SENSE_NORTH,   lambda: self.MotionSensNorthTrigger())
         gpio.registerIsr(Trigger.MOTION_SENSE_TERRACE, lambda: self.MotionSensTerraceTrigger())
         gpio.registerIsr(Trigger.UNUSED_SENSE_,        lambda: self.SpareTrigger())
-    
     def MotionSensSouthTrigger(self):
         print("MOTION_SENSE_SOUTH triggered")
         self.trigger[Trigger.MOTION_SENSE_SOUTH]   = True
