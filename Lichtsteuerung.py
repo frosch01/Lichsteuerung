@@ -10,6 +10,7 @@ from operator import methodcaller
 from enum import IntEnum
 import time
 import atexit
+import asyncio
 
 class Trigger(IntEnum):
     MOTION_SENSE_SOUTH   = 0
@@ -17,6 +18,17 @@ class Trigger(IntEnum):
     MOTION_SENSE_TERRACE = 2
     UNUSED_SENSE_        = 3
     MAX_TRIGGER          = 4
+    
+class Relais(IntEnum):
+    LAMP_WEST    = 0
+    LAMP_SOUTH   = 1
+    LAMP_NORTH   = 2
+    LAMP_TERRACE = 3
+    MAX_RELAIS   = 4
+    
+class RelaisState(IntEnum):
+    On  = GPIO.LOW
+    Off = GPIO.HIGH
     
 class MyGPIO(GPIO):
     relaisPins = [1, 4, 5, 6, 26, 27, 28, 29]
@@ -44,6 +56,8 @@ class MyGPIO(GPIO):
         self.IterateCall(super(MyGPIO, self).digitalWrite, pins, *args)
     def registerIsr(self, input, func):
         self.wiringPiISR(MyGPIO.inputPins[input], GPIO.INT_EDGE_FALLING, func)
+    def setRelais(self, relais, state):
+        self.digitalWrite(MyGPIO.relaisPins[relais], state)
     def relaisTest(self):
         self.digitalWrite(MyGPIO.relaisPins, GPIO.LOW)
         time.sleep(1)
@@ -60,28 +74,49 @@ class MyGPIO(GPIO):
 class LightControl(object):    
     def __init__(self, gpio):
         self.gpio = gpio
-        self.trigger = [False for x in range(Trigger.MAX_TRIGGER)]
+        self.tasks = [None for x in range(Relais.MAX_RELAIS)]
         gpio.registerIsr(Trigger.MOTION_SENSE_SOUTH,   lambda: self.MotionSensSouthTrigger())
         gpio.registerIsr(Trigger.MOTION_SENSE_NORTH,   lambda: self.MotionSensNorthTrigger())
         gpio.registerIsr(Trigger.MOTION_SENSE_TERRACE, lambda: self.MotionSensTerraceTrigger())
         gpio.registerIsr(Trigger.UNUSED_SENSE_,        lambda: self.SpareTrigger())
+        self.loop = asyncio.get_event_loop()
     def MotionSensSouthTrigger(self):
         print("MOTION_SENSE_SOUTH triggered")
-        self.trigger[Trigger.MOTION_SENSE_SOUTH]   = True
-        self.gpio.digitalWrite(MyGPIO.relaisPins, GPIO.LOW)
+        self.loop.call_soon_threadsafe(self.keepLampOn, Relais.LAMP_SOUTH, 10)
+        self.loop.call_soon_threadsafe(self.keepLampOn, Relais.LAMP_WEST, 10)
+        #asyncio.run_coroutine_threadsafe(self.keepLampOn(Relais.LAMP_SOUTH, 5), self.loop)
     def MotionSensTerraceTrigger(self):
         print("MotionSensTerrace triggered")
-        self.trigger[Trigger.MOTION_SENSE_TERRACE] = True
-        self.gpio.digitalWrite(MyGPIO.relaisPins, GPIO.LOW)
+        self.loop.call_soon_threadsafe(self.keepLampOn, Relais.LAMP_TERRACE, 10)
     def MotionSensNorthTrigger(self):
         print("MotionSenseNorth triggered")
-        self.trigger[Trigger.MOTION_SENSE_NORTH]   = True
-        self.gpio.digitalWrite(MyGPIO.relaisPins, GPIO.LOW)
+        self.loop.call_soon_threadsafe(self.keepLampOn, Relais.LAMP_NORTH, 10)
     def SpareTrigger(self):
         print("Spare triggered")
-        self.trigger[Trigger.UNUSED_SENSE_]        = True
-        self.gpio.digitalWrite(MyGPIO.relaisPins, GPIO.LOW)
         
+    def keepLampOn(self, lamp, time):
+        try:
+            self.tasks[lamp].cancel()
+        except:
+            pass
+        self.tasks[lamp] = self.loop.create_task(self.keepLampOnCoroutine(lamp, time))
+        print("Start of keepLampOn for %s, %ds" %(lamp, time))
+    @asyncio.coroutine
+    def keepLampOnCoroutine(self, lamp, time):
+        try:
+            self.gpio.setRelais(lamp, RelaisState.On)
+            end_time = self.loop.time() + time
+            while True:
+                now = self.loop.time()
+                if (now) >= end_time:
+                    break
+                yield from asyncio.sleep(1)
+            self.gpio.setRelais(lamp, RelaisState.Off)
+        except asyncio.CancelledError: 
+            print("keepLampOn for %s cancelled" % lamp) 
+        else:
+            print("keepLampOn for %s done" % lamp)
+
 gpio=MyGPIO(MyGPIO.WPI_MODE_PINS);
 lightControl = LightControl(gpio);
 
@@ -94,20 +129,6 @@ if __name__ == "__main__":
     
     atexit.register(shutdown)
     gpio.relaisTest()
-
-    timer=0
-    while True:
-        print(timer)
-        time.sleep(1)
-        if lightControl.trigger[Trigger.MOTION_SENSE_SOUTH] or \
-           lightControl.trigger[Trigger.MOTION_SENSE_NORTH] or \
-           lightControl.trigger[Trigger.MOTION_SENSE_TERRACE] or \
-           lightControl.trigger[Trigger.UNUSED_SENSE_]:
-            lightControl.trigger = [False for x in range(Trigger.MAX_TRIGGER)]
-            timer=5
-            
-        if timer != 0:
-            timer-=1
-            if (0 == timer):
-                gpio.digitalWrite(MyGPIO.relaisPins, GPIO.HIGH)
-            
+    
+    loop = asyncio.get_event_loop()
+    loop.run_forever()
