@@ -71,57 +71,65 @@ class MyGPIO(GPIO):
         self.pullUpDnControl(MyGPIO.inputPins,  GPIO.PUD_DOWN)
         self.pullUpDnControl(MyGPIO.pwmPins,  GPIO.PUD_DOWN)
         
+class RelaisActor:
+    def __init__(self, gpio, relais):
+        self.gpio        = gpio
+        self.loop        = asyncio.get_event_loop()
+        self.task        = None
+        self.turnOffTime = self.loop.time()
+        self.relais      = relais
+    def turnOnTimeSpan(self, timeSpan):
+        self.gpio.setRelais(self.relais, RelaisState.On)
+        turnOffTime = self.loop.time() + timeSpan
+        if self.turnOffTime < turnOffTime: self.turnOffTime = turnOffTime
+        runTask = False
+        try:
+            runTask = self.task.done()
+        except AttributeError:
+            runTask = True
+        if runTask:
+            self.task = self.loop.create_task(self.turnOffAfter())
+            print("Start of turnOffAfter for %s until %s" %(self.relais, self.turnOffTime))
+        else:
+            print("turnOffAfter for %s already running. Until %s" %(self.relais, turnOffTime))
+    @asyncio.coroutine
+    def turnOffAfter(self):
+        try:
+            while True:
+                now = self.loop.time()
+                print(now)
+                if (now) >= self.turnOffTime:
+                    break
+                yield from asyncio.sleep(1)
+            self.gpio.setRelais(self.relais, RelaisState.Off)
+        except asyncio.CancelledError: 
+            print("turnOffAfter for %s cancelled" % self.relais) 
+        else:
+            print("turnOffAfter for %s done" % self.relais)
+        
 class LightControl(object):    
     def __init__(self, gpio):
         self.gpio = gpio
         self.loop = asyncio.get_event_loop()
-        self.tasks   = [None for x in range(Relais.MAX_RELAIS)]
-        self.offTime = [self.loop.time() for x in range(Relais.MAX_RELAIS)]
+        self.relaisList = [RelaisActor(gpio, x) for x in Relais]
         gpio.registerIsr(Trigger.MOTION_SENSE_SOUTH,   lambda: self.MotionSensSouthTrigger())
         gpio.registerIsr(Trigger.MOTION_SENSE_NORTH,   lambda: self.MotionSensNorthTrigger())
         gpio.registerIsr(Trigger.MOTION_SENSE_TERRACE, lambda: self.MotionSensTerraceTrigger())
         gpio.registerIsr(Trigger.UNUSED_SENSE_,        lambda: self.SpareTrigger())
     def MotionSensSouthTrigger(self):
         print("MOTION_SENSE_SOUTH triggered")
-        self.loop.call_soon_threadsafe(self.keepRelaisOnFor, Relais.LAMP_SOUTH, 10)
-        self.loop.call_soon_threadsafe(self.keepRelaisOnFor, Relais.LAMP_WEST, 10)
+        self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_SOUTH].turnOnTimeSpan, 10)
+        self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_WEST].turnOnTimeSpan,  10)
+        #self.loop.call_soon_threadsafe(self.keepRelaisOnFor, Relais.LAMP_WEST, 10)
         #asyncio.run_coroutine_threadsafe(self.keepRelaisOnFor(Relais.LAMP_SOUTH, 5), self.loop)
     def MotionSensTerraceTrigger(self):
         print("MotionSensTerrace triggered")
-        self.loop.call_soon_threadsafe(self.keepRelaisOnFor, Relais.LAMP_TERRACE, 10)
+        self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_TERRACE].turnOnTimeSpan, 10)
     def MotionSensNorthTrigger(self):
         print("MotionSenseNorth triggered")
-        self.loop.call_soon_threadsafe(self.keepRelaisOnFor, Relais.LAMP_NORTH, 10)
+        self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_NORTH].turnOnTimeSpan, 10)
     def SpareTrigger(self):
         print("Spare triggered")
-    def keepRelaisOnFor(self, lamp, time):
-        self.gpio.setRelais(lamp, RelaisState.On)
-        offTime = self.loop.time() + time
-        if self.offTime[lamp] < offTime: self.offTime[lamp] = offTime
-        runTask = False
-        try:
-            runTask = self.tasks[lamp].done()
-        except AttributeError:
-            runTask = True
-        if runTask:
-            self.tasks[lamp] = self.loop.create_task(self.turnOffAfter(lamp))
-            print("Start of turnOffAfter for %s until %s" %(lamp, self.offTime[lamp]))
-        else:
-            print("turnOffAfter for %s already running until %s" %(lamp, self.offTime[lamp]))
-    @asyncio.coroutine
-    def turnOffAfter(self, lamp):
-        try:
-            while True:
-                now = self.loop.time()
-                print(now)
-                if (now) >= self.offTime[lamp]:
-                    break
-                yield from asyncio.sleep(1)
-            self.gpio.setRelais(lamp, RelaisState.Off)
-        except asyncio.CancelledError: 
-            print("turnOffAfter for %s cancelled" % lamp) 
-        else:
-            print("turnOffAfter for %s done" % lamp)
 
 gpio=MyGPIO(MyGPIO.WPI_MODE_PINS);
 lightControl = LightControl(gpio);
