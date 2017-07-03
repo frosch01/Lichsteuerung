@@ -11,6 +11,7 @@ from enum import IntEnum
 import time
 import atexit
 import asyncio
+import sys
 
 class Trigger(IntEnum):
     MOTION_SENSE_SOUTH   = 0
@@ -77,10 +78,12 @@ class RelaisActor:
         self.loop        = asyncio.get_event_loop()
         self.task        = None
         self.turnOffTime = self.loop.time()
+        self.turnOnTime  = sys.float_info.max
         self.relais      = relais
-    def turnOnTimeSpan(self, timeSpan):
-        self.gpio.setRelais(self.relais, RelaisState.On)
-        turnOffTime = self.loop.time() + timeSpan
+    def turnOnTimeSpan(self, after, timeSpan):
+        turnOnTime  = self.loop.time() + after 
+        turnOffTime = turnOnTime + timeSpan
+        if self.turnOnTime  > turnOnTime:  self.turnOnTime  = turnOnTime
         if self.turnOffTime < turnOffTime: self.turnOffTime = turnOffTime
         runTask = False
         try:
@@ -88,24 +91,27 @@ class RelaisActor:
         except AttributeError:
             runTask = True
         if runTask:
-            self.task = self.loop.create_task(self.turnOffAfter())
-            print("Start of turnOffAfter for %s until %s" %(self.relais, self.turnOffTime))
+            self.task = self.loop.create_task(self.turnOnOffTimeControl())
+            print("Start of turnOnOffTimeControl for %s from %s until %s" %(self.relais, self.turnOnTime, self.turnOffTime))
         else:
-            print("turnOffAfter for %s already running. Until %s" %(self.relais, turnOffTime))
+            print("turnOnOffTimeControl for %s already running. From %s until %s" %(self.relais, self.turnOnTime, self.turnOffTime))
     @asyncio.coroutine
-    def turnOffAfter(self):
+    def turnOnOffTimeControl(self):
         try:
             while True:
                 now = self.loop.time()
-                print(now)
-                if (now) >= self.turnOffTime:
+                if now >= self.turnOffTime:
                     break
+                if now >= self.turnOnTime and now < self.turnOnTime + 1:
+                    print("%.1f: %s turned ON" % (now, self.relais))
+                    self.gpio.setRelais(self.relais, RelaisState.On)
                 yield from asyncio.sleep(1)
             self.gpio.setRelais(self.relais, RelaisState.Off)
         except asyncio.CancelledError: 
-            print("turnOffAfter for %s cancelled" % self.relais) 
+            print("%.1f: %s cancelled" % (now, self.relais)) 
         else:
-            print("turnOffAfter for %s done" % self.relais)
+            print("%.1f: %s turned OFF" % (now, self.relais))
+        self.turnOnTime = sys.float_info.max
         
 class LightControl(object):    
     def __init__(self, gpio):
@@ -117,17 +123,24 @@ class LightControl(object):
         gpio.registerIsr(Trigger.MOTION_SENSE_TERRACE, lambda: self.MotionSensTerraceTrigger())
         gpio.registerIsr(Trigger.UNUSED_SENSE_,        lambda: self.SpareTrigger())
     def MotionSensSouthTrigger(self):
-        print("MOTION_SENSE_SOUTH triggered")
-        self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_SOUTH].turnOnTimeSpan, 10)
-        self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_WEST].turnOnTimeSpan,  10)
-        #self.loop.call_soon_threadsafe(self.keepRelaisOnFor, Relais.LAMP_WEST, 10)
+        print("MotionSensSouthTrigger triggered")
+        self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_TERRACE].turnOnTimeSpan, 4, 10)
+        self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_SOUTH].turnOnTimeSpan,   0, 10)
+        self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_WEST].turnOnTimeSpan,    2, 10)
+        self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_NORTH].turnOnTimeSpan,   6, 10)
         #asyncio.run_coroutine_threadsafe(self.keepRelaisOnFor(Relais.LAMP_SOUTH, 5), self.loop)
     def MotionSensTerraceTrigger(self):
         print("MotionSensTerrace triggered")
-        self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_TERRACE].turnOnTimeSpan, 10)
+        self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_TERRACE].turnOnTimeSpan, 0, 10)
+        self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_SOUTH].turnOnTimeSpan,   5, 10)
+        self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_WEST].turnOnTimeSpan,    3, 10)
+        self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_NORTH].turnOnTimeSpan,   5, 10)
     def MotionSensNorthTrigger(self):
         print("MotionSenseNorth triggered")
-        self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_NORTH].turnOnTimeSpan, 10)
+        self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_TERRACE].turnOnTimeSpan, 3, 10)
+        self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_SOUTH].turnOnTimeSpan,   3, 10)
+        self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_WEST].turnOnTimeSpan,    5, 10)
+        self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_NORTH].turnOnTimeSpan,   0, 10)
     def SpareTrigger(self):
         print("Spare triggered")
 
