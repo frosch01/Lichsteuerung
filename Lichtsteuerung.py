@@ -131,8 +131,9 @@ class LightControl(object):
         gpio.registerIsr(Trigger.MOTION_SENSE_NORTH,   lambda: self._MotionSensNorthTrigger())
         gpio.registerIsr(Trigger.MOTION_SENSE_TERRACE, lambda: self._MotionSensTerraceTrigger())
         gpio.registerIsr(Trigger.UNUSED_SENSE_,        lambda: self._SpareTrigger())
-        self.loopThread = Thread(target = self._LoopThread, args = ())
-        
+        self.loopThread = Thread(target = self._LoopThread, args = ()).start()
+    def TerminateLoopThread(self):
+        self.loop.call_soon_threadsafe(self.loop.stop)
     def _LoopThread(self):
         print("Thread for asyncio loop started")
         asyncio.set_event_loop(self.loop)
@@ -160,17 +161,20 @@ class LightControl(object):
     def _SpareTrigger(self):
         print("Spare triggered")
 
-def shutdown():
-    print("Lichsteuerung terminating...", )
-    gpio.cleanup()
-    print("done")
+gpio=MyGPIO(MyGPIO.WPI_MODE_PINS);
+lightControl = LightControl(gpio);
+
 
 if __name__ == "__main__":
-    atexit.register(shutdown)
-    gpio=MyGPIO(MyGPIO.WPI_MODE_PINS);
     gpio.relaisTest()
-    
-    lightControl = LightControl(gpio);
-    
-    loop = asyncio.get_event_loop()
-    loop.run_forever()
+        
+    try:
+        while True:
+            time.sleep(1)
+    except:
+        pass
+        
+    print("Lichsteuerung terminating...", )
+    lightControl.TerminateLoopThread()
+    gpio.cleanup()
+    print("done")
