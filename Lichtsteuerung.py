@@ -133,6 +133,7 @@ class LightControl(object):
         gpio.registerIsr(Trigger.UNUSED_SENSE_,        lambda: self._SpareTrigger())
         self.loopThread = Thread(target = self._LoopThread, args = ()).start()
     def TerminateLoopThread(self):
+        print("Asyncio loop running in thread will be stopped")
         self.loop.call_soon_threadsafe(self.loop.stop)
     def _LoopThread(self):
         print("Thread for asyncio loop started")
