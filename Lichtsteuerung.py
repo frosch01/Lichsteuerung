@@ -5,14 +5,15 @@ Documentation, License etc.
 @package Lichtsteuerung
 '''
 
-import os
-if os.uname()[1] == 'raspberrypi':
-    print("Raspberry PI detected. Running on real GPIO pins")
-    from wiringpi import GPIO
-else:
+try:
+    f = open('/sys/firmware/devicetree/base/model', 'r')
+except OSError:
     print("No Raspberry PI detected. Running with stub GPIO")
     from GPIO_stub import GPIO
-
+else:
+    print("Raspberry PI model %s detected. Running on real GPIO pins" % f.readline())
+    from wiringpi import GPIO
+    
 from operator import methodcaller
 from enum import IntEnum
 import time
