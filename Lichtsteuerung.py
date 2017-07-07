@@ -14,12 +14,13 @@ else:
     print("Raspberry PI model %s detected. Running on real GPIO pins" % f.readline())
     from wiringpi import GPIO
     
-from operator import methodcaller
-from enum import IntEnum
 import time
 import atexit
 import asyncio
 import sys
+from operator import methodcaller
+from enum import IntEnum
+from threading import Thread
 
 class Trigger(IntEnum):
     MOTION_SENSE_SOUTH   = 0
@@ -81,9 +82,9 @@ class MyGPIO(GPIO):
         self.pullUpDnControl(MyGPIO.pwmPins,  GPIO.PUD_DOWN)
         
 class RelaisActor:
-    def __init__(self, gpio, relais):
+    def __init__(self, gpio, relais, loop):
         self.gpio        = gpio
-        self.loop        = asyncio.get_event_loop()
+        self.loop        = loop
         self.task        = None
         self.turnOffTime = self.loop.time()
         self.turnOnTime  = sys.float_info.max
@@ -121,39 +122,43 @@ class RelaisActor:
             print("%.1f: %s turned OFF" % (now, self.relais))
         self.turnOnTime = sys.float_info.max
         
-class LightControl(object):    
+class LightControl(object):
     def __init__(self, gpio):
         self.gpio = gpio
-        self.loop = asyncio.get_event_loop()
-        self.relaisList = [RelaisActor(gpio, x) for x in Relais]
-        gpio.registerIsr(Trigger.MOTION_SENSE_SOUTH,   lambda: self.MotionSensSouthTrigger())
-        gpio.registerIsr(Trigger.MOTION_SENSE_NORTH,   lambda: self.MotionSensNorthTrigger())
-        gpio.registerIsr(Trigger.MOTION_SENSE_TERRACE, lambda: self.MotionSensTerraceTrigger())
-        gpio.registerIsr(Trigger.UNUSED_SENSE_,        lambda: self.SpareTrigger())
-    def MotionSensSouthTrigger(self):
+        self.loop = asyncio.new_event_loop()
+        self.relaisList = [RelaisActor(gpio, x, self.loop) for x in Relais]
+        gpio.registerIsr(Trigger.MOTION_SENSE_SOUTH,   lambda: self._MotionSensSouthTrigger())
+        gpio.registerIsr(Trigger.MOTION_SENSE_NORTH,   lambda: self._MotionSensNorthTrigger())
+        gpio.registerIsr(Trigger.MOTION_SENSE_TERRACE, lambda: self._MotionSensTerraceTrigger())
+        gpio.registerIsr(Trigger.UNUSED_SENSE_,        lambda: self._SpareTrigger())
+        self.loopThread = Thread(target = self._LoopThread, args = ())
+        
+    def _LoopThread(self):
+        print("Thread for asyncio loop started")
+        asyncio.set_event_loop(self.loop)
+        self.loop.run_forever()
+        
+    def _MotionSensSouthTrigger(self):
         print("MotionSensSouthTrigger triggered")
         self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_TERRACE].turnOnTimeSpan, 4, 10)
         self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_SOUTH].turnOnTimeSpan,   0, 10)
         self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_WEST].turnOnTimeSpan,    2, 10)
         self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_NORTH].turnOnTimeSpan,   6, 10)
         #asyncio.run_coroutine_threadsafe(self.keepRelaisOnFor(Relais.LAMP_SOUTH, 5), self.loop)
-    def MotionSensTerraceTrigger(self):
+    def _MotionSensTerraceTrigger(self):
         print("MotionSensTerrace triggered")
         self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_TERRACE].turnOnTimeSpan, 0, 10)
         self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_SOUTH].turnOnTimeSpan,   5, 10)
         self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_WEST].turnOnTimeSpan,    3, 10)
         self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_NORTH].turnOnTimeSpan,   5, 10)
-    def MotionSensNorthTrigger(self):
+    def _MotionSensNorthTrigger(self):
         print("MotionSenseNorth triggered")
         self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_TERRACE].turnOnTimeSpan, 3, 10)
         self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_SOUTH].turnOnTimeSpan,   3, 10)
         self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_WEST].turnOnTimeSpan,    5, 10)
         self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_NORTH].turnOnTimeSpan,   0, 10)
-    def SpareTrigger(self):
+    def _SpareTrigger(self):
         print("Spare triggered")
-
-gpio=MyGPIO(MyGPIO.WPI_MODE_PINS);
-lightControl = LightControl(gpio);
 
 def shutdown():
     print("Lichsteuerung terminating...", )
@@ -161,9 +166,11 @@ def shutdown():
     print("done")
 
 if __name__ == "__main__":
-    
     atexit.register(shutdown)
+    gpio=MyGPIO(MyGPIO.WPI_MODE_PINS);
     gpio.relaisTest()
+    
+    lightControl = LightControl(gpio);
     
     loop = asyncio.get_event_loop()
     loop.run_forever()
