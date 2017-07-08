@@ -18,9 +18,11 @@ import time
 import atexit
 import asyncio
 import sys
+from light_ui import LightUi
 from operator import methodcaller
 from enum import IntEnum
 from threading import Thread
+from flexx import app
 
 class Trigger(IntEnum):
     MOTION_SENSE_SOUTH   = 0
@@ -123,18 +125,20 @@ class RelaisActor:
         self.turnOnTime = sys.float_info.max
         
 class LightControl(object):
-    def __init__(self, gpio):
-        self.gpio = gpio
+    def __init__(self):
+        self.gpio = MyGPIO(MyGPIO.WPI_MODE_PINS)
+        self.gpio.relaisTest()
         self.loop = asyncio.new_event_loop()
-        self.relaisList = [RelaisActor(gpio, x, self.loop) for x in Relais]
-        gpio.registerIsr(Trigger.MOTION_SENSE_SOUTH,   lambda: self._MotionSensSouthTrigger())
-        gpio.registerIsr(Trigger.MOTION_SENSE_NORTH,   lambda: self._MotionSensNorthTrigger())
-        gpio.registerIsr(Trigger.MOTION_SENSE_TERRACE, lambda: self._MotionSensTerraceTrigger())
-        gpio.registerIsr(Trigger.UNUSED_SENSE_,        lambda: self._SpareTrigger())
+        self.relaisList = [RelaisActor(self.gpio, x, self.loop) for x in Relais]
+        self.gpio.registerIsr(Trigger.MOTION_SENSE_SOUTH,   lambda: self._MotionSensSouthTrigger())
+        self.gpio.registerIsr(Trigger.MOTION_SENSE_NORTH,   lambda: self._MotionSensNorthTrigger())
+        self.gpio.registerIsr(Trigger.MOTION_SENSE_TERRACE, lambda: self._MotionSensTerraceTrigger())
+        self.gpio.registerIsr(Trigger.UNUSED_SENSE_,        lambda: self._SpareTrigger())
         self.loopThread = Thread(target = self._LoopThread, args = ()).start()
     def TerminateLoopThread(self):
         print("Asyncio loop running in thread will be stopped")
         self.loop.call_soon_threadsafe(self.loop.stop)
+        self.gpio.cleanup()
     def _LoopThread(self):
         print("Thread for asyncio loop started")
         asyncio.set_event_loop(self.loop)
@@ -162,20 +166,18 @@ class LightControl(object):
     def _SpareTrigger(self):
         print("Spare triggered")
 
-gpio=MyGPIO(MyGPIO.WPI_MODE_PINS);
-lightControl = LightControl(gpio);
-
-
 if __name__ == "__main__":
-    gpio.relaisTest()
+    lightControl = LightControl()
+    
+    app.create_server(host="0.0.0.0", port=8080)
+    m = app.serve(LightUi)
         
     try:
-        while True:
-            time.sleep(1)
+        app.start()    
     except:
         pass
         
     print("Lichsteuerung terminating...", )
     lightControl.TerminateLoopThread()
-    gpio.cleanup()
+    app.stop()
     print("done")
