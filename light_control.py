@@ -18,11 +18,9 @@ import time
 import atexit
 import asyncio
 import sys
-from light_ui import LightUi
 from operator import methodcaller
 from enum import IntEnum
 from threading import Thread
-from flexx import app
 
 class Trigger(IntEnum):
     MOTION_SENSE_SOUTH   = 0
@@ -165,19 +163,3 @@ class LightControl(object):
         self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_NORTH].turnOnTimeSpan,   0, 10)
     def _SpareTrigger(self):
         print("Spare triggered")
-
-if __name__ == "__main__":
-    lightControl = LightControl()
-    
-    app.create_server(host="0.0.0.0", port=8080)
-    m = app.serve(LightUi)
-        
-    try:
-        app.start()    
-    except:
-        pass
-        
-    print("Lichsteuerung terminating...", )
-    lightControl.TerminateLoopThread()
-    app.stop()
-    print("done")
