@@ -5,7 +5,7 @@ Documentation, License etc.
 @package Lichtsteuerung
 '''
 
-from flexx import app, ui, event
+from flexx import ui, event
 
 class LightUi(ui.Widget):
     def init(self):
@@ -47,8 +47,3 @@ class LightUi(ui.Widget):
                     self.detectorGarageButtonActive = ui.RadioButton(text='active', checked = True)
                     self.detectorGarageButtonMasked = ui.RadioButton(text='masked')
             ui.Widget(flex=1)
-
-if __name__ == '__main__':
-    app.create_server(host="0.0.0.0", port=8080)
-    m = app.serve(LightUi)
-    app.start()
