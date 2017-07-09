@@ -6,7 +6,9 @@ Documentation, License etc.
 '''
 
 from flexx import app, ui, event
-from light_control import LightControl
+from light_control import LightControl, Trigger, Relais, RelaisMode
+
+lightControl = LightControl()
 
 class LightUi(ui.Widget):
     def init(self):
@@ -49,6 +51,20 @@ class LightUi(ui.Widget):
                     self.detectorGarageButtonMasked = ui.RadioButton(text='masked')
             ui.Widget(flex=1)
             
+    @event.connect('lampYardFrontState')
+    def handle_changes_to_foo_in_python(self, *events):
+        print(events)
+        ev = events[-1]
+        if ev.new_value == 'auto': lightControl.setRelaisMode(Relais.LAMP_WEST, RelaisMode.Auto)
+        if ev.new_value == 'on':   lightControl.setRelaisMode(Relais.LAMP_WEST, RelaisMode.On)
+        if ev.new_value == 'off':  lightControl.setRelaisMode(Relais.LAMP_WEST, RelaisMode.Off)
+
+
+    class Both:
+        @event.prop
+        def lampYardFrontState(self, state='auto'):
+            return state
+
     class JS:
 
 #        @event.connect('b1.mouse_click', 'b2.mouse_click','b3.mouse_click',  )
@@ -56,12 +72,11 @@ class LightUi(ui.Widget):
 #            ev = events[-1]
 #            self.buttonlabel.text = 'Clicked on the ' + ev.source.text
 
-        @event.connect('r1.checked', 'r2.checked','r3.checked')
+        @event.connect('lampYardFrontButtonAuto.checked', 
+                       'lampYardFrontButtonOn.checked',
+                       'lampYardFrontButtonOff.checked')
         def _radio_changed(self, *events):
-            # There will also be events for radio buttons being unchecked, but
-            # Flexx ensures that the last event is for the one being checked
-            ev = events[-1]
-            self.radiolabel.text = 'Selected the ' + ev.source.text
+            self.lampYardFrontState = events[-1].source.text
 
 #        @event.connect('c1.checked', 'c2.checked','c3.checked',  )
 #        def _check_changed(self, *events):
@@ -74,13 +89,11 @@ class LightUi(ui.Widget):
 
 if __name__ == "__main__":
     
-    lightControl = LightControl()
-    
     app.create_server(host="0.0.0.0", port=8080)
     m = app.serve(LightUi)
         
     try:
-        app.start()    
+        app.start()
     except:
         pass
         

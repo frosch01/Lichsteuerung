@@ -36,6 +36,11 @@ class Relais(IntEnum):
     LAMP_TERRACE = 3
     MAX_RELAIS   = 4
     
+class RelaisMode(IntEnum):
+    Off  = 0
+    On   = 1
+    Auto = 2
+    
 class RelaisState(IntEnum):
     On  = GPIO.LOW
     Off = GPIO.HIGH
@@ -89,6 +94,14 @@ class RelaisActor:
         self.turnOffTime = self.loop.time()
         self.turnOnTime  = sys.float_info.max
         self.relais      = relais
+        self.mode        = RelaisMode.Auto
+    def setMode(self, mode):
+        self.mode = mode
+        if self.mode == RelaisMode.On: 
+            self.gpio.setRelais(self.relais, RelaisState.On)
+        if self.mode == RelaisMode.Off:
+            self.gpio.setRelais(self.relais, RelaisState.Off)
+        
     def turnOnTimeSpan(self, after, timeSpan):
         turnOnTime  = self.loop.time() + after 
         turnOffTime = turnOnTime + timeSpan
@@ -137,6 +150,8 @@ class LightControl(object):
         print("Asyncio loop running in thread will be stopped")
         self.loop.call_soon_threadsafe(self.loop.stop)
         self.gpio.cleanup()
+    def setRelaisMode(self, relais, mode):
+        self.relaisList[relais].setMode(mode)
     def _LoopThread(self):
         print("Thread for asyncio loop started")
         asyncio.set_event_loop(self.loop)
