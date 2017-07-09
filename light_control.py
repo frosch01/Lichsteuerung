@@ -97,10 +97,9 @@ class RelaisActor:
         self.mode        = RelaisMode.Auto
     def setMode(self, mode):
         self.mode = mode
-        if self.mode == RelaisMode.On: 
-            self.gpio.setRelais(self.relais, RelaisState.On)
-        if self.mode == RelaisMode.Off:
-            self.gpio.setRelais(self.relais, RelaisState.Off)
+        if self.mode == RelaisMode.On:     self.gpio.setRelais(self.relais, RelaisState.On)
+        elif self.mode == RelaisMode.Off:  self.gpio.setRelais(self.relais, RelaisState.Off)
+        elif self.mode == RelaisMode.Auto: self.gpio.setRelais(self.relais, RelaisState.Off)
         
     def turnOnTimeSpan(self, after, timeSpan):
         turnOnTime  = self.loop.time() + after 
