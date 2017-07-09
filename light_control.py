@@ -124,16 +124,19 @@ class RelaisActor:
                 if now >= self.turnOffTime:
                     break
                 if now >= self.turnOnTime and now < self.turnOnTime + 1:
-                    print("%.1f: %s turned ON" % (now, self.relais))
                     if self.mode == RelaisMode.Auto: 
                         self.gpio.setRelais(self.relais, RelaisState.On)
+                        print("%.1f: %s turned ON" % (now, self.relais))
+                    else:
+                        print("%.1f: %s is in mode %s" % (now, self.relais, self.mode))
                 yield from asyncio.sleep(1)
-            if self.mode == RelaisMode.Auto: 
+            if self.mode == RelaisMode.Auto:
                 self.gpio.setRelais(self.relais, RelaisState.Off)
+                print("%.1f: %s turned OFF" % (now, self.relais))
+            else:
+                print("%.1f: %s is in mode %s" % (now, self.relais, self.mode))
         except asyncio.CancelledError: 
             print("%.1f: %s cancelled" % (now, self.relais)) 
-        else:
-            print("%.1f: %s turned OFF" % (now, self.relais))
         self.turnOnTime = sys.float_info.max
         
 class LightControl(object):
