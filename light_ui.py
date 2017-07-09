@@ -6,7 +6,7 @@ Documentation, License etc.
 '''
 
 from flexx import app, ui, event
-from light_control import LightControl, Trigger, Relais, RelaisMode
+from light_control import LightControl, Detector, DetectorMode, Relais, RelaisMode
 
 lightControl = LightControl()
 
@@ -43,28 +43,39 @@ class LightUi(ui.Widget):
                     self.detectorYardButtonMasked = ui.RadioButton(text='masked')
             with ui.GroupWidget(title='Detector garden'):
                 with ui.HBox():
-                    self.detectorGardenButtonActive = ui.RadioButton(text='active', checked = True)
-                    self.detectorGardenButtonMasked = ui.RadioButton(text='masked')
+                    self.detectorTerraceButtonActive = ui.RadioButton(text='active', checked = True)
+                    self.detectorTerraceButtonMasked = ui.RadioButton(text='masked')
             with ui.GroupWidget(title='Detector garage'):
                 with ui.HBox():
                     self.detectorGarageButtonActive = ui.RadioButton(text='active', checked = True)
                     self.detectorGarageButtonMasked = ui.RadioButton(text='masked')
             ui.Widget(flex=1)
             
-    @event.connect('changeLampState')
-    def handleStateChange(self, *events):
+    @event.connect('changeLampMode')
+    def handleLampModeChange(self, *events):
         ev = events[-1]
-        if ev.lamp == 'LampYardFront': relais = Relais.LAMP_WEST
+        if   ev.lamp == 'LampYardFront': relais = Relais.LAMP_WEST
         elif ev.lamp == 'LampYardRear':  relais = Relais.LAMP_SOUTH
         elif ev.lamp == 'LampTerrace':   relais = Relais.LAMP_TERRACE
         elif ev.lamp == 'LampGarage':    relais = Relais.LAMP_NORTH
-        else: raise ValueError
-                
-        if ev.mode == 'on':   mode = RelaisMode.On
-        if ev.mode == 'off':  mode = RelaisMode.Off
-        if ev.mode == 'auto': mode = RelaisMode.Auto
-        
+        else: raise ValueError                
+        if   ev.mode == 'on':   mode = RelaisMode.On
+        elif ev.mode == 'off':  mode = RelaisMode.Off
+        elif ev.mode == 'auto': mode = RelaisMode.Auto
+        else: raise ValueError                
         lightControl.setRelaisMode(relais, mode)
+
+    @event.connect('changeDetectorMode')
+    def handleDetectorModeChange(self, *events):
+        ev = events[-1]
+        if   ev.detector == 'DetectorYard':    detector = Detector.MOTION_SENSE_SOUTH
+        elif ev.detector == 'DetectorTerrace': detector = Detector.MOTION_SENSE_TERRACE
+        elif ev.detector == 'DetectorGarage':  detector = Detector.MOTION_SENSE_NORTH
+        else: raise ValueError
+        if   ev.mode == 'active':  mode = DetectorMode.Active
+        elif ev.mode == 'masked':  mode = DetectorMode.Masked
+        else: raise ValueError                
+        lightControl.setDetectorMode(detector, mode)
 
     class JS:
 
@@ -74,36 +85,58 @@ class LightUi(ui.Widget):
 #            self.buttonlabel.text = 'Clicked on the ' + ev.source.text
 
         @event.emitter
-        def changeLampState(self, js_event):
+        def changeLampMode(self, js_event):
             return dict(lamp=js_event['lamp'], mode=js_event['mode'])
+
+        @event.emitter
+        def changeDetectorMode(self, js_event):
+            return dict(detector=js_event['detector'], mode=js_event['mode'])
 
         @event.connect('lampYardFrontButtonAuto.checked', 
                        'lampYardFrontButtonOn.checked',
                        'lampYardFrontButtonOff.checked')
         def radioLampYardFrontChanged(self, *events):
             ev = events[-1]
-            self.changeLampState({'lamp': 'LampYardFront', 'mode': ev.source.text})
+            self.changeLampMode({'lamp': 'LampYardFront', 'mode': ev.source.text})
 
         @event.connect('lampYardRearButtonAuto.checked', 
                        'lampYardRearButtonOn.checked',
                        'lampYardRearButtonOff.checked')
         def radioLampYardRearChanged(self, *events):
             ev = events[-1]
-            self.changeLampState({'lamp': 'LampYardRear', 'mode': ev.source.text})
+            self.changeLampMode({'lamp': 'LampYardRear', 'mode': ev.source.text})
 
         @event.connect('lampTerraceButtonAuto.checked', 
                        'lampTerraceButtonOn.checked',
                        'lampTerraceButtonOff.checked')
         def radioLampTerraceChanged(self, *events):
             ev = events[-1]
-            self.changeLampState({'lamp': 'LampTerrace', 'mode': ev.source.text})
+            self.changeLampMode({'lamp': 'LampTerrace', 'mode': ev.source.text})
 
         @event.connect('lampGarageButtonAuto.checked', 
                        'lampGarageButtonOn.checked',
                        'lampGarageButtonOff.checked')
         def radioLampGarageChanged(self, *events):
             ev = events[-1]
-            self.changeLampState({'lamp': 'LampGarage', 'mode': ev.source.text})
+            self.changeLampMode({'lamp': 'LampGarage', 'mode': ev.source.text})
+
+        @event.connect('detectorYardButtonActive.checked', 
+                       'detectorYardButtonMasked.checked')
+        def radioDetectorYardChanged(self, *events):
+            ev = events[-1]
+            self.changeDetectorMode({'detector': 'DetectorYard', 'mode': ev.source.text})
+
+        @event.connect('detectorTerraceButtonActive.checked', 
+                       'detectorTerraceButtonMasked.checked')
+        def radioDetectorTerraceChanged(self, *events):
+            ev = events[-1]
+            self.changeDetectorMode({'detector': 'DetectorTerrace', 'mode': ev.source.text})
+
+        @event.connect('detectorGarageButtonActive.checked', 
+                       'detectorGarageButtonMasked.checked')
+        def radioDetectorGarageChanged(self, *events):
+            ev = events[-1]
+            self.changeDetectorMode({'detector': 'DetectorGarage', 'mode': ev.source.text})
 
 #        @event.connect('c1.checked', 'c2.checked','c3.checked',  )
 #        def _check_changed(self, *events):

@@ -22,24 +22,26 @@ from operator import methodcaller
 from enum import IntEnum
 from threading import Thread
 
-class Trigger(IntEnum):
+class Detector(IntEnum):
     MOTION_SENSE_SOUTH   = 0
     MOTION_SENSE_NORTH   = 1
     MOTION_SENSE_TERRACE = 2
     UNUSED_SENSE_        = 3
-    MAX_TRIGGER          = 4
     
 class Relais(IntEnum):
     LAMP_WEST    = 0
     LAMP_SOUTH   = 1
     LAMP_NORTH   = 2
     LAMP_TERRACE = 3
-    MAX_RELAIS   = 4
     
 class RelaisMode(IntEnum):
     Off  = 0
     On   = 1
     Auto = 2
+    
+class DetectorMode(IntEnum):
+    Masked  = 0
+    Active  = 1
     
 class RelaisState(IntEnum):
     On  = GPIO.LOW
@@ -144,11 +146,12 @@ class LightControl(object):
         self.gpio = MyGPIO(MyGPIO.WPI_MODE_PINS)
         self.gpio.relaisTest()
         self.loop = asyncio.new_event_loop()
-        self.relaisList = [RelaisActor(self.gpio, x, self.loop) for x in Relais]
-        self.gpio.registerIsr(Trigger.MOTION_SENSE_SOUTH,   lambda: self._MotionSensSouthTrigger())
-        self.gpio.registerIsr(Trigger.MOTION_SENSE_NORTH,   lambda: self._MotionSensNorthTrigger())
-        self.gpio.registerIsr(Trigger.MOTION_SENSE_TERRACE, lambda: self._MotionSensTerraceTrigger())
-        self.gpio.registerIsr(Trigger.UNUSED_SENSE_,        lambda: self._SpareTrigger())
+        self.relaisList   = [RelaisActor(self.gpio, x, self.loop) for x in Relais]
+        self.detectorList = [DetectorMode.Active for x in Detector]
+        self.gpio.registerIsr(Detector.MOTION_SENSE_SOUTH,   lambda: self._MotionSensSouthTrigger())
+        self.gpio.registerIsr(Detector.MOTION_SENSE_NORTH,   lambda: self._MotionSensNorthTrigger())
+        self.gpio.registerIsr(Detector.MOTION_SENSE_TERRACE, lambda: self._MotionSensTerraceTrigger())
+        self.gpio.registerIsr(Detector.UNUSED_SENSE_,        lambda: self._SpareTrigger())
         self.loopThread = Thread(target = self._LoopThread, args = ()).start()
     def TerminateLoopThread(self):
         print("Asyncio loop running in thread will be stopped")
@@ -156,29 +159,40 @@ class LightControl(object):
         self.gpio.cleanup()
     def setRelaisMode(self, relais, mode):
         self.relaisList[relais].setMode(mode)
+    def setDetectorMode(self, detector, mode):
+        self.detectorList[detector] = mode
     def _LoopThread(self):
         print("Thread for asyncio loop started")
         asyncio.set_event_loop(self.loop)
         self.loop.run_forever()
         
     def _MotionSensSouthTrigger(self):
-        print("MotionSensSouthTrigger triggered")
-        self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_TERRACE].turnOnTimeSpan, 4, 10)
-        self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_SOUTH].turnOnTimeSpan,   0, 10)
-        self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_WEST].turnOnTimeSpan,    2, 10)
-        self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_NORTH].turnOnTimeSpan,   6, 10)
-        #asyncio.run_coroutine_threadsafe(self.keepRelaisOnFor(Relais.LAMP_SOUTH, 5), self.loop)
+        if detectorList[Detector.MOTION_SENSE_SOUTH] == DetectorMode.Active:
+            print("MotionSensSouth triggered")
+            self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_TERRACE].turnOnTimeSpan, 4, 10)
+            self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_SOUTH].turnOnTimeSpan,   0, 10)
+            self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_WEST].turnOnTimeSpan,    2, 10)
+            self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_NORTH].turnOnTimeSpan,   6, 10)
+            #asyncio.run_coroutine_threadsafe(self.keepRelaisOnFor(Relais.LAMP_SOUTH, 5), self.loop)
+        else:
+            print("MotionSensSouth masked")
     def _MotionSensTerraceTrigger(self):
-        print("MotionSensTerrace triggered")
-        self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_TERRACE].turnOnTimeSpan, 0, 10)
-        self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_SOUTH].turnOnTimeSpan,   5, 10)
-        self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_WEST].turnOnTimeSpan,    3, 10)
-        self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_NORTH].turnOnTimeSpan,   5, 10)
+        if detectorList[Detector.MOTION_SENSE_TERRACE] == DetectorMode.Active:
+            print("MotionSensTerrace triggered")
+            self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_TERRACE].turnOnTimeSpan, 0, 10)
+            self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_SOUTH].turnOnTimeSpan,   5, 10)
+            self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_WEST].turnOnTimeSpan,    3, 10)
+            self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_NORTH].turnOnTimeSpan,   5, 10)
+        else:
+            print("MotionSensTerrace masked")
     def _MotionSensNorthTrigger(self):
-        print("MotionSenseNorth triggered")
-        self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_TERRACE].turnOnTimeSpan, 3, 10)
-        self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_SOUTH].turnOnTimeSpan,   3, 10)
-        self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_WEST].turnOnTimeSpan,    5, 10)
-        self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_NORTH].turnOnTimeSpan,   0, 10)
+        if detectorList[Detector.MOTION_SENSE_NORTH] == DetectorMode.Active:
+            print("MotionSenseNorth triggered")
+            self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_TERRACE].turnOnTimeSpan, 3, 10)
+            self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_SOUTH].turnOnTimeSpan,   3, 10)
+            self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_WEST].turnOnTimeSpan,    5, 10)
+            self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_NORTH].turnOnTimeSpan,   0, 10)
+        else:
+            print("MotionSensNorth masked")
     def _SpareTrigger(self):
         print("Spare triggered")
