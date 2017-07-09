@@ -167,7 +167,7 @@ class LightControl(object):
         self.loop.run_forever()
         
     def _MotionSensSouthTrigger(self):
-        if detectorList[Detector.MOTION_SENSE_SOUTH] == DetectorMode.Active:
+        if self.detectorList[Detector.MOTION_SENSE_SOUTH] == DetectorMode.Active:
             print("MotionSensSouth triggered")
             self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_TERRACE].turnOnTimeSpan, 4, 10)
             self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_SOUTH].turnOnTimeSpan,   0, 10)
@@ -177,7 +177,7 @@ class LightControl(object):
         else:
             print("MotionSensSouth masked")
     def _MotionSensTerraceTrigger(self):
-        if detectorList[Detector.MOTION_SENSE_TERRACE] == DetectorMode.Active:
+        if self.detectorList[Detector.MOTION_SENSE_TERRACE] == DetectorMode.Active:
             print("MotionSensTerrace triggered")
             self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_TERRACE].turnOnTimeSpan, 0, 10)
             self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_SOUTH].turnOnTimeSpan,   5, 10)
@@ -186,7 +186,7 @@ class LightControl(object):
         else:
             print("MotionSensTerrace masked")
     def _MotionSensNorthTrigger(self):
-        if detectorList[Detector.MOTION_SENSE_NORTH] == DetectorMode.Active:
+        if self.detectorList[Detector.MOTION_SENSE_NORTH] == DetectorMode.Active:
             print("MotionSenseNorth triggered")
             self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_TERRACE].turnOnTimeSpan, 3, 10)
             self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_SOUTH].turnOnTimeSpan,   3, 10)
