@@ -55,10 +55,15 @@ class MyGPIO(GPIO):
     def __init__(self, mode):
         super().__init__(mode)
         self.pinMode(MyGPIO.relaisPins, GPIO.OUTPUT)
-        self.pinMode(MyGPIO.pwmPins, GPIO.OUTPUT)
-        self.pinMode(MyGPIO.inputPins, GPIO.INPUT)
+        self.pinMode(MyGPIO.pwmPins,    GPIO.PWM_OUTPUT)
+        self.pinMode(MyGPIO.inputPins,  GPIO.INPUT)
         self.pullUpDnControl(MyGPIO.relaisPins, GPIO.PUD_OFF)
-        self.pullUpDnControl(MyGPIO.inputPins, GPIO.PUD_OFF)
+        self.pullUpDnControl(MyGPIO.pwmPins,    GPIO.PUD_OFF)
+        self.pullUpDnControl(MyGPIO.inputPins,  GPIO.PUD_OFF)
+        self.pwmSetMode (self.pwmPins[0], GPIO.PWM_MODE_MS)
+        self.pwmSetClock(self.pwmPins[0], 1920)
+        self.pwmSetRange(self.pwmPins[0], 100)
+        self.pwmWrite   (self.pwmPins[0], 20)
     def IterateCall(self, call, pins, *args):
         try:
             for pin in pins:
