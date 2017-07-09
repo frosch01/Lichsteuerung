@@ -53,7 +53,7 @@ class GPIO(object):
   def gpioClockSet(self,*args):
     pass
   def pwmWrite(self,*args):
-    pass
+    print("GPIO-PWM %d set to %d" %(args[0], args[1]))
 
   def pinMode(self,*args):
     pass

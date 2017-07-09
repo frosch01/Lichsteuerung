@@ -34,6 +34,9 @@ class Relais(IntEnum):
     LAMP_NORTH   = 2
     LAMP_TERRACE = 3
     
+class Pwm(IntEnum):
+    LAMP_TERRACE = 0
+    
 class RelaisMode(IntEnum):
     Off  = 0
     On   = 1
@@ -80,6 +83,10 @@ class MyGPIO(GPIO):
         self.wiringPiISR(MyGPIO.inputPins[input], GPIO.INT_EDGE_FALLING, func)
     def setRelais(self, relais, state):
         self.digitalWrite(MyGPIO.relaisPins[relais], state)
+    def setPwm(self, pwm, value):
+        intVal = int(value)
+        if intVal < 0 or intVal > 100: raise ValueError
+        self.pwmWrite(MyGPIO.pwmPins[pwm], intVal)
     def relaisTest(self):
         self.digitalWrite(MyGPIO.relaisPins, GPIO.LOW)
         time.sleep(1)
@@ -88,10 +95,10 @@ class MyGPIO(GPIO):
     def cleanup(self):
         self.pinMode(MyGPIO.relaisPins, GPIO.INPUT)
         self.pinMode(MyGPIO.inputPins,  GPIO.INPUT)
-        self.pinMode(MyGPIO.pwmPins,  GPIO.INPUT)
+        self.pinMode(MyGPIO.pwmPins,    GPIO.INPUT)
         self.pullUpDnControl(MyGPIO.relaisPins, GPIO.PUD_DOWN)
         self.pullUpDnControl(MyGPIO.inputPins,  GPIO.PUD_DOWN)
-        self.pullUpDnControl(MyGPIO.pwmPins,  GPIO.PUD_DOWN)
+        self.pullUpDnControl(MyGPIO.pwmPins,    GPIO.PUD_DOWN)
         
 class RelaisActor:
     def __init__(self, gpio, relais, loop):
@@ -166,6 +173,8 @@ class LightControl(object):
         self.relaisList[relais].setMode(mode)
     def setDetectorMode(self, detector, mode):
         self.detectorList[detector] = mode
+    def setPwm(self, pwm, value):
+        self.gpio.setPwm(pwm, value)
     def _LoopThread(self):
         print("Thread for asyncio loop started")
         asyncio.set_event_loop(self.loop)

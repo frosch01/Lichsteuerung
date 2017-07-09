@@ -6,7 +6,7 @@ Documentation, License etc.
 '''
 
 from flexx import app, ui, event
-from light_control import LightControl, Detector, DetectorMode, Relais, RelaisMode
+from light_control import LightControl, Detector, DetectorMode, Relais, RelaisMode, Pwm
 
 lightControl = LightControl()
 
@@ -76,13 +76,15 @@ class LightUi(ui.Widget):
         elif ev.mode == 'masked':  mode = DetectorMode.Masked
         else: raise ValueError                
         lightControl.setDetectorMode(detector, mode)
-
+        
+    @event.connect('changeBrightness')
+    def handleBrightnessChange(self, *events):
+        ev = events[-1]
+        if ev.lamp == 'LampTerrace':  lamp = Pwm.LAMP_TERRACE
+        else: raise ValueError
+        lightControl.setPwm(lamp, ev.value)
+        
     class JS:
-
-#        @event.connect('b1.mouse_click', 'b2.mouse_click','b3.mouse_click',  )
-#        def _button_clicked(self, *events):
-#            ev = events[-1]
-#            self.buttonlabel.text = 'Clicked on the ' + ev.source.text
 
         @event.emitter
         def changeLampMode(self, js_event):
@@ -91,6 +93,10 @@ class LightUi(ui.Widget):
         @event.emitter
         def changeDetectorMode(self, js_event):
             return dict(detector=js_event['detector'], mode=js_event['mode'])
+
+        @event.emitter
+        def changeBrightness(self, js_event):
+            return dict(lamp=js_event['lamp'], value=js_event['value'])
 
         @event.connect('lampYardFrontButtonAuto.checked', 
                        'lampYardFrontButtonOn.checked',
@@ -138,14 +144,10 @@ class LightUi(ui.Widget):
             ev = events[-1]
             self.changeDetectorMode({'detector': 'DetectorGarage', 'mode': ev.source.text})
 
-#        @event.connect('c1.checked', 'c2.checked','c3.checked',  )
-#        def _check_changed(self, *events):
-#            selected = [c.text for c in (self.c1, self.c2, self.c3) if c.checked]
-#            if selected:
-#                self.checklabel.text = 'Selected: ' + ', '.join(selected)
-#            else:
-#                self.checklabel.text = 'None selected'
-
+        @event.connect('lampTerraceBrightnessSlider.value')
+        def sliderChangeBrightness(self, *events):
+            ev = events[-1]
+            self.changeBrightness({'lamp': 'LampTerrace', 'value': ev.new_value})
 
 if __name__ == "__main__":
     
