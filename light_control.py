@@ -125,9 +125,11 @@ class RelaisActor:
                     break
                 if now >= self.turnOnTime and now < self.turnOnTime + 1:
                     print("%.1f: %s turned ON" % (now, self.relais))
-                    self.gpio.setRelais(self.relais, RelaisState.On)
+                    if self.mode == RelaisMode.Auto: 
+                        self.gpio.setRelais(self.relais, RelaisState.On)
                 yield from asyncio.sleep(1)
-            self.gpio.setRelais(self.relais, RelaisState.Off)
+            if self.mode == RelaisMode.Auto: 
+                self.gpio.setRelais(self.relais, RelaisState.Off)
         except asyncio.CancelledError: 
             print("%.1f: %s cancelled" % (now, self.relais)) 
         else:
