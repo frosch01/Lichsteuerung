@@ -2,7 +2,7 @@
 '''
 Documentation, License etc.
 
-@package Lichtsteuerung
+@package light_control
 '''
 
 from flexx import app, ui, event

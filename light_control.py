@@ -2,7 +2,7 @@
 '''
 Documentation, License etc.
 
-@package Lichtsteuerung
+@package light_control
 '''
 
 try:
@@ -18,9 +18,11 @@ import time
 import atexit
 import asyncio
 import sys
+import datetime
 from operator import methodcaller
 from enum import IntEnum
 from threading import Thread
+from astral import Location
 
 class Detector(IntEnum):
     MOTION_SENSE_SOUTH   = 0
@@ -114,7 +116,6 @@ class RelaisActor:
         if self.mode == RelaisMode.On:     self.gpio.setRelais(self.relais, RelaisState.On)
         elif self.mode == RelaisMode.Off:  self.gpio.setRelais(self.relais, RelaisState.Off)
         elif self.mode == RelaisMode.Auto: self.gpio.setRelais(self.relais, RelaisState.Off)
-        
     def turnOnTimeSpan(self, after, timeSpan):
         turnOnTime  = self.loop.time() + after 
         turnOffTime = turnOnTime + timeSpan
@@ -178,6 +179,7 @@ class LightControl(object):
     def _LoopThread(self):
         print("Thread for asyncio loop started")
         asyncio.set_event_loop(self.loop)
+        self._setSunTimes()
         self.loop.run_forever()
         
     def _MotionSensSouthTrigger(self):
@@ -210,3 +212,35 @@ class LightControl(object):
             print("MotionSensNorth masked")
     def _SpareTrigger(self):
         print("Spare triggered")
+        
+    def _getTimeDiff(self, t1, t2):
+        return (t2.hour   - t1.hour)   * 3600 + \
+               (t2.minute - t1.minute) * 60 + \
+               (t2.second - t1.second)
+           
+    def _setIsNight(self, now):
+        timeToSunrise = self._getTimeDiff(now.time(), self.sunrise.time())
+        timeToSunset  = self._getTimeDiff(now.time(), self.sunset.time())
+        if timeToSunrise < 300 and timeToSunset > 300 : self.isNight = False
+        else: self.isNight = True
+        if timeToSunrise < 0: timeToSunrise += 24*3600
+        if timeToSunset  < 0: timeToSunset  += 24*3600
+        if self.isNight: return timeToSunrise
+        else: return timeToSunset
+        
+    def _setSunTimes(self):
+        city = Location(info=('Stuttgart', 'Germany', 48.742211, 9.2068, 'Europe/Berlin', 430))
+        city.solar_depression = 'civil'
+        now = datetime.datetime.now(city.tz)
+        sun = city.sun(date=datetime.date.today(), local=True)
+        self.sunset  = sun['sunset']
+        self.sunrise = sun['sunrise']
+        #print("Sunrise %s, Sunset %s" %(self.sunrise, self.sunset))
+        #print("now %s" % now)
+        #print("time %s, sunrise %s, sunset %s" % (now.time(), self.sunrise.time(), self.sunset.time()))
+        #print("diff sunrise %d, diff sunset %d" %(self._getTimeDiff(now.time(), self.sunrise.time()),  self._getTimeDiff(now.time(), self.sunset.time())))
+        timeToActivation = self._setIsNight(now)
+        print("%s: It is " %(now), end = '')
+        if self.isNight: print("night!")
+        else: print("day!")
+        self.loop.call_later(timeToActivation, self._setSunTimes)

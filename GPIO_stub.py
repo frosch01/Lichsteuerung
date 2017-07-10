@@ -1,3 +1,10 @@
+#!/usr/bin/python3
+'''
+Documentation, License etc.
+
+@package light_control
+'''
+
 class GPIO(object):
   WPI_MODE_PINS = 0
   WPI_MODE_GPIO = 1
