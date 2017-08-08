@@ -116,6 +116,8 @@ class RelaisActor:
         if self.mode == RelaisMode.On:     self.gpio.setRelais(self.relais, RelaisState.On)
         elif self.mode == RelaisMode.Off:  self.gpio.setRelais(self.relais, RelaisState.Off)
         elif self.mode == RelaisMode.Auto: self.gpio.setRelais(self.relais, RelaisState.Off)
+    def getMode(self):
+        return self.mode
     def turnOnTimeSpan(self, after, timeSpan):
         turnOnTime  = self.loop.time() + after 
         turnOffTime = turnOnTime + timeSpan
@@ -172,8 +174,12 @@ class LightControl(object):
         self.gpio.cleanup()
     def setRelaisMode(self, relais, mode):
         self.relaisList[relais].setMode(mode)
+    def getRelaisMode(self, relais):
+        return self.relaisList[relais].getMode()
     def setDetectorMode(self, detector, mode):
         self.detectorList[detector] = mode
+    def getDetectorMode(self, detector):
+        return self.detectorList[detector]
     def setPwm(self, pwm, value):
         self.gpio.setPwm(pwm, value)
     def _LoopThread(self):
@@ -235,7 +241,7 @@ class LightControl(object):
         sun = city.sun(date=datetime.date.today(), local=True)
         self.sunset  = sun['sunset']
         self.sunrise = sun['sunrise']
-        #print("Sunrise %s, Sunset %s" %(self.sunrise, self.sunset))
+        print("Sunrise %s, Sunset %s" %(self.sunrise, self.sunset))
         #print("now %s" % now)
         #print("time %s, sunrise %s, sunset %s" % (now.time(), self.sunrise.time(), self.sunset.time()))
         #print("diff sunrise %d, diff sunset %d" %(self._getTimeDiff(now.time(), self.sunrise.time()),  self._getTimeDiff(now.time(), self.sunset.time())))
