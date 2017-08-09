@@ -83,7 +83,7 @@ class LightUi(ui.Widget):
                     LampRadioHBox('lampTerrace', Relais.LAMP_TERRACE)
                     with ui.HBox():
                         ui.CheckBox(flex=0, text='Dim')
-                        self.lampTerraceBrightnessSlider = ui.Slider(flex = 1, min=1, max = 100)
+                        self.lampTerraceBrightnessSlider = ui.Slider(flex = 1, min=12, max = 90)
             with ui.GroupWidget(title='Lamp garage'):
                 LampRadioHBox('lampGarage', Relais.LAMP_NORTH)
             with ui.GroupWidget(title='Detector yard'):

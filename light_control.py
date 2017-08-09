@@ -66,7 +66,7 @@ class MyGPIO(GPIO):
         self.pullUpDnControl(MyGPIO.pwmPins,    GPIO.PUD_OFF)
         self.pullUpDnControl(MyGPIO.inputPins,  GPIO.PUD_OFF)
         self.pwmSetMode (GPIO.PWM_MODE_MS)
-        self.pwmSetClock(1920)
+        self.pwmSetClock(480)
         self.pwmSetRange(100)
         self.pwmWrite   (self.pwmPins[0], 20)
     def IterateCall(self, call, pins, *args):
