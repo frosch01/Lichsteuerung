@@ -33,8 +33,8 @@ class Detector(IntEnum):
 class Relais(IntEnum):
     LAMP_WEST    = 0
     LAMP_SOUTH   = 1
-    LAMP_NORTH   = 2
-    LAMP_TERRACE = 3
+    LAMP_TERRACE = 2
+    LAMP_NORTH   = 3
     
 class Pwm(IntEnum):
     LAMP_TERRACE = 0

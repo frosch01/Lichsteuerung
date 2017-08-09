@@ -74,7 +74,7 @@ class DetectorRadioHBox(ui.HBox):
 class LightUi(ui.Widget):
     def init(self):
         with ui.BoxLayout(orientation='v'):
-            with ui.GroupWidget(title='Lamp yard front') as p:
+            with ui.GroupWidget(title='Lamp yard front'):
                 LampRadioHBox('lampYardFront', Relais.LAMP_WEST)
             with ui.GroupWidget(title='Lamp yard rear'):
                 LampRadioHBox('lampYardRear', Relais.LAMP_SOUTH)
