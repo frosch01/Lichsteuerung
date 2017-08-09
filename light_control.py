@@ -26,8 +26,8 @@ from astral import Location
 
 class Detector(IntEnum):
     MOTION_SENSE_SOUTH   = 0
-    MOTION_SENSE_NORTH   = 1
-    MOTION_SENSE_TERRACE = 2
+    MOTION_SENSE_TERRACE = 1
+    MOTION_SENSE_NORTH   = 2
     UNUSED_SENSE_        = 3
     
 class Relais(IntEnum):
