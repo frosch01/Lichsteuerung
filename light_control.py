@@ -189,33 +189,39 @@ class LightControl(object):
         self.loop.run_forever()
         
     def _MotionSensSouthTrigger(self):
-        if self.detectorList[Detector.MOTION_SENSE_SOUTH] == DetectorMode.Active:
+        if self.detectorList[Detector.MOTION_SENSE_SOUTH] != DetectorMode.Active:
+            print("MotionSensSouth trigger masked by UI")
+        elif not self.isNight:
+            print("MotionSensSouth trigger ignored, it is day!")
+        else:
             print("MotionSensSouth triggered")
-            self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_TERRACE].turnOnTimeSpan, 4, 10)
-            self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_SOUTH].turnOnTimeSpan,   0, 10)
-            self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_WEST].turnOnTimeSpan,    2, 10)
-            self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_NORTH].turnOnTimeSpan,   6, 10)
+            self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_TERRACE].turnOnTimeSpan, 4, 120)
+            self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_SOUTH].turnOnTimeSpan,   0, 60)
+            self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_WEST].turnOnTimeSpan,    2, 180)
+            self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_NORTH].turnOnTimeSpan,   6, 120)
             #asyncio.run_coroutine_threadsafe(self.keepRelaisOnFor(Relais.LAMP_SOUTH, 5), self.loop)
-        else:
-            print("MotionSensSouth masked")
     def _MotionSensTerraceTrigger(self):
-        if self.detectorList[Detector.MOTION_SENSE_TERRACE] == DetectorMode.Active:
+        if self.detectorList[Detector.MOTION_SENSE_TERRACE] != DetectorMode.Active:
+            print("MotionSensTerrace trigger masked by UI")
+        elif not self.isNight:
+            print("MotionSensTerrace trigger ignored, it is day!")
+        else:
             print("MotionSensTerrace triggered")
-            self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_TERRACE].turnOnTimeSpan, 0, 10)
-            self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_SOUTH].turnOnTimeSpan,   5, 10)
-            self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_WEST].turnOnTimeSpan,    3, 10)
-            self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_NORTH].turnOnTimeSpan,   5, 10)
-        else:
-            print("MotionSensTerrace masked")
+            self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_TERRACE].turnOnTimeSpan, 0, 120)
+            self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_SOUTH].turnOnTimeSpan,   5, 60)
+            self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_WEST].turnOnTimeSpan,    3, 60)
+            self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_NORTH].turnOnTimeSpan,   5, 60)
     def _MotionSensNorthTrigger(self):
-        if self.detectorList[Detector.MOTION_SENSE_NORTH] == DetectorMode.Active:
-            print("MotionSenseNorth triggered")
-            self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_TERRACE].turnOnTimeSpan, 3, 10)
-            self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_SOUTH].turnOnTimeSpan,   3, 10)
-            self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_WEST].turnOnTimeSpan,    5, 10)
-            self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_NORTH].turnOnTimeSpan,   0, 10)
+        if self.detectorList[Detector.MOTION_SENSE_NORTH] != DetectorMode.Active:
+            print("MotionSenseNorth trigger masked by UI")
+        elif not self.isNight:
+            print("MotionSenseNorth trigger ignored, it is day!")
         else:
-            print("MotionSensNorth masked")
+            print("MotionSenseNorth triggered")
+            self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_TERRACE].turnOnTimeSpan, 3, 120)
+            #self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_SOUTH].turnOnTimeSpan,   3, 10)
+            self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_WEST].turnOnTimeSpan,    5, 120)
+            self.loop.call_soon_threadsafe(self.relaisList[Relais.LAMP_NORTH].turnOnTimeSpan,   0, 180)
     def _SpareTrigger(self):
         print("Spare triggered")
         
