@@ -112,10 +112,11 @@ class RelaisActor:
         self.relais      = relais
         self.mode        = RelaisMode.Auto
     def setMode(self, mode):
-        self.mode = mode
-        if self.mode == RelaisMode.On:     self.gpio.setRelais(self.relais, RelaisState.On)
-        elif self.mode == RelaisMode.Off:  self.gpio.setRelais(self.relais, RelaisState.Off)
-        elif self.mode == RelaisMode.Auto: self.gpio.setRelais(self.relais, RelaisState.Off)
+        if self.mode != mode:
+            self.mode = mode
+            if self.mode == RelaisMode.On:     self.gpio.setRelais(self.relais, RelaisState.On)
+            elif self.mode == RelaisMode.Off:  self.gpio.setRelais(self.relais, RelaisState.Off)
+            elif self.mode == RelaisMode.Auto: self.gpio.setRelais(self.relais, RelaisState.Off)
     def getMode(self):
         return self.mode
     def turnOnTimeSpan(self, after, timeSpan):
@@ -186,6 +187,7 @@ class LightControl(object):
         print("Thread for asyncio loop started")
         asyncio.set_event_loop(self.loop)
         self._setSunTimes()
+        self._setDefaultModes()
         self.loop.run_forever()
         
     def _MotionSensSouthTrigger(self):
@@ -229,6 +231,19 @@ class LightControl(object):
         return (t2.hour   - t1.hour)   * 3600 + \
                (t2.minute - t1.minute) * 60 + \
                (t2.second - t1.second)
+           
+    def _setDefaultModes(self):
+        for relais in Relais:
+            self.setRelaisMode(relais, RelaisMode.Auto)
+        for detector in Detector:
+            self.setDetectorMode(detector, DetectorMode.Active)
+        now = datetime.datetime.today()
+        nextResetTime = now.replace(hour=6, minute=0, second=0, microsecond=0) 
+        if now.hour > 5:
+            nextResetTime += datetime.timedelta(days=1)
+        secondsToReset = (nextResetTime - now).total_seconds()
+        print("%s: Next reset of modes at %s, in %d seconds" %(now, nextResetTime, secondsToReset))
+        self.loop.call_later(secondsToReset, self._setDefaultModes)
            
     def _setIsNight(self, now):
         timeToSunrise = self._getTimeDiff(now.time(), self.sunrise.time())
