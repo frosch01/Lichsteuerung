@@ -1,0 +1,5 @@
+.kdev4
+*.kdev4
+pcb/Doc
+__pycache__/
+.directory
