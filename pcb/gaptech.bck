@@ -1,0 +1,15 @@
+EESchema-DOCLIB  Version 2.0
+#
+$CMP LMP78_03-1.0
+D 1000mA Regulated 5W DC/DC converter, non isolated, 3.3V fixed Output Voltage, like 78xx
+K Gaptec dc-dc converter transformer
+F https://gaptec-electronic.com/de/dc-dc-wandler-pol/#LMP78_10
+$ENDCMP
+#
+$CMP LMP78_05-1.0
+D 1000mA Regulated 5W DC/DC converter, non isolated, 5.0V fixed Output Voltage, like 78xx
+K Gaptec dc-dc converter transformer
+F https://gaptec-electronic.com/de/dc-dc-wandler-pol/#LMP78_10
+$ENDCMP
+#
+#End Doc Library

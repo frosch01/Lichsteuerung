@@ -1,0 +1,5 @@
+(sym_lib_table
+  (lib (name "lichsteuerung-eagle-import")(type "Legacy")(uri "${KIPRJMOD}/lichsteuerung-eagle-import.lib")(options "")(descr ""))
+  (lib (name "gaptech")(type "Legacy")(uri "${KIPRJMOD}/gaptech.lib")(options "")(descr ""))
+  (lib (name "lichsteuerung-rescue")(type "Legacy")(uri "${KIPRJMOD}/lichsteuerung-rescue.lib")(options "")(descr ""))
+)
