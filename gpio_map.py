@@ -1,19 +1,12 @@
 """
-Access the relais, S0 inputs and PWM output of the LightControl HW
+Map the relais, S0 inputs and PWM output of the I/O Shield
 """
 
-# try:
-#    f = open('/sys/firmware/devicetree/base/model', 'r', encoding="ascii")
-# except OSError:
-#    print("No Raspberry PI detected. Running with stub GPIO")
-#    from GPIO_stub import GPIO
-# else:
-#    print(f"Raspberry PI model {f.readline()} detected. Running on real GPIO pins")
-
 from enum import IntEnum
-import asyncio
+from dataclasses import dataclass
 import gpiod
 from gpiod.line import Direction, Value, Edge
+from gpiod import EdgeEvent
 from rpi_hardware_pwm import HardwarePWM
 import version_check
 
@@ -25,16 +18,28 @@ class RelaisState(IntEnum):
     ON = 0
     OFF = 1
 
+@dataclass
+class S0Event:
+    s0_index: int
+    event: EdgeEvent
 
-class IoControl():
-    """Map HW design to RPI GPIOs"""
-    RELAIS_PINS = [18, 23, 24, 25, 12, 16, 20, 21]
-    DETECTOR_PINS = [4, 17, 27, 22]
-    METER_PINS = [5, 6, 19, 26]
-    PWM_CHANNELS = [(1, 2000)]  # Channel 1, 2000Hz
+class GpioMap():
+    """Map I/O shield design to RPI GPIOs, provide common class
+
+    A single class for interfacing the I/O shield. Maps the GPIO-Pins to
+    relais and PWM outputs and S0 inputs. Uses gpiod and rpi_hardware_pwm
+    packages for acessing HW.
+
+    Arguments:
+        consumer (str): Name of application registered with gpiod
+    """
+    RELAIS_PINS = (18, 23, 24, 25, 12, 16, 20, 21)
+    S0_PINS = (4, 17, 27, 22, 5, 6, 19, 26)
+    PWM_CHANNELS = ((1, 2000),)  # Channel 1, 2000Hz
     CHIP_PATH = "/dev/gpiochip0"
+    S0_INDEX_LOOKUP = dict(zip(S0_PINS, range(len(S0_PINS))))
 
-    def __init__(self, consumer):
+    def __init__(self, consumer="GpioMap"):
         self.relais = gpiod.request_lines(
             self.CHIP_PATH,
             consumer=consumer,
@@ -50,11 +55,11 @@ class IoControl():
             self.CHIP_PATH,
             consumer=consumer,
             config={l: gpiod.LineSettings(
-                edge_detection=Edge.RISING) for l in self.DETECTOR_PINS + self.METER_PINS},
+                edge_detection=Edge.RISING) for l in self.S0_PINS},
         )
 
-        self.dims = list(map(lambda x: HardwarePWM(*x), self.PWM_CHANNELS))
-        for pwm in self.dims:
+        self.pwms = list(map(lambda p: HardwarePWM(*p), self.PWM_CHANNELS))
+        for pwm in self.pwms:
             pwm.start(100)
 
     def __enter__(self):
@@ -63,63 +68,40 @@ class IoControl():
     def __exit__(self, exp_type, value, traceback):
         self.relais.set_values({r: Value(RelaisState.OFF)
                                 for r in self.RELAIS_PINS})
-        list(map(lambda p: p.stop(), self.dims))
+        list(map(lambda p: p.stop(), self.pwms))
         return exp_type is None
 
     def set_relais(self, relais, state):
-        """Set the state of a relais"""
+        """Set the state of one relais
+
+        Arguments:
+        relais (int): Index of the Relais, see self.RELAIS_PINS
+        state (RelaisState): RelaisState.ON or RelaisState.OFF
+        """
         self.relais.set_value(self.RELAIS_PINS[relais], Value(state))
 
-    async def timed_on(self, relais, duration):
-        """Turn the relais on to a given time"""
-        self.relais.set_value(self.RELAIS_PINS[relais], Value(RelaisState.ON))
-        await asyncio.sleep(duration)
-        self.relais.set_value(self.RELAIS_PINS[relais], Value(RelaisState.OFF))
-
     def set_pwm(self, pwm, value):
-        """Set the duty cycle of a PWM"""
-        value = int(min(100, max(0, value)))
-        self.dims[pwm].change_duty_cycle(value)
+        """Set the duty cycle of a PWM
 
-    def __detector_event_thread(self, wait_timeout):
-        """Thread method for reading edge events from gpiod"""
-        if self.s0s.wait_edge_events(wait_timeout):
-            return self.s0s.read_edge_events()
-        return []
-
-    async def handle_detector_events(self, wait_timeout=1):
-        """Add this method to your asyncio loop to receive edge events
-
-        For a proper exception handling, a future from this coroutine shall
-        be awaited. It is recommneded to add the future to an asyncio.gather.
-        Wrapping in an asyncio task shall only be done if the task is awaited
-        in order to receive exceptions and to have a proper termination
-        handling.
+        Arguments:
+        pwm (int): Index of PWM, see self.PWM_CHANNELS
+        value (int): Duty cycle in percent, max is 100
         """
-        loop = asyncio.get_running_loop()
-        while True:
-            # await handles exceptions and signals
-            for event in await loop.run_in_executor(
-                None,
-                self.__detector_event_thread,
-                wait_timeout
-            ):
-                try:
-                    print(f"{event.timestamp_ns}: Received detector event "
-                          f"#{self.DETECTOR_PINS.index(event.line_offset)}")
-                except ValueError:
-                    pass
+        value = int(min(100, max(0, value)))
+        self.pwms[pwm].change_duty_cycle(value)
 
-                try:
-                    print(f"{event.timestamp_ns}: Received meter event "
-                          f"#{self.METER_PINS.index(event.line_offset)}")
-                except ValueError:
-                    pass
+    def read_input_events(self, wait_timeout=0):
+        """Read edge events from gpiod. Map event to S0 index
 
-    async def relais_test(self):
-        """Test sequence for all relais. The on time is derived from the gpio offset"""
-        await asyncio.gather(
-            *list(
-                map(lambda r: self.timed_on(r, r), range(len(self.RELAIS_PINS)))
-            )
-        )
+        This is a blocking call for reading edge events from S0 inputs.
+
+        Arguments:
+        wait_timeout (int): Time to wait for an event. None = infinite wait
+
+        Returns:
+        list[S0Event]: The list is empty on timeout
+        """
+        if self.s0s.wait_edge_events(wait_timeout):
+            events=self.s0s.read_edge_events()
+            return [S0Event(self.S0_INDEX_LOOKUP[e.line_offset], e) for e in events]
+        return []
