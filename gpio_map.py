@@ -18,10 +18,17 @@ class RelaisState(IntEnum):
     ON = 0
     OFF = 1
 
+
 @dataclass
 class S0Event:
+    """Extend gpiod::EdgeEvent with S0 index
+
+    S0 index is provided to get upper layer code away from Raspberry PI pin
+    naming schema. Enumeration is done based on a count starting as 0.
+    """
     s0_index: int
     event: EdgeEvent
+
 
 class GpioMap():
     """Map I/O shield design to RPI GPIOs, provide common class
@@ -102,6 +109,6 @@ class GpioMap():
         list[S0Event]: The list is empty on timeout
         """
         if self.s0s.wait_edge_events(wait_timeout):
-            events=self.s0s.read_edge_events()
+            events = self.s0s.read_edge_events()
             return [S0Event(self.S0_INDEX_LOOKUP[e.line_offset], e) for e in events]
         return []
