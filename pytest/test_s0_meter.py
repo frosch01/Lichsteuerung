@@ -7,7 +7,7 @@ class TestS0Meter:
     def test_increment(self):
         with mock.patch.object(s0_meter.time, 'monotonic_ns') as mock_monotonic_ns:
             mock_monotonic_ns.return_value = 1000000000 # 1s
-            meter = S0Meter()
+            meter = S0Meter("Test")
             assert meter.total == 0
             assert meter.last_event == 1000000000
             meter.pulse(2000000000) # 2s

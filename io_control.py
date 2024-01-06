@@ -1,6 +1,7 @@
 """Map GPIO to installation and provide async interfaces to GPIO"""
 import asyncio
 from gpio_map import GpioMap, Value, RelaisState
+from s0_meter import S0Meter
 
 
 class IoControl:
@@ -15,6 +16,12 @@ class IoControl:
 
     def __init__(self, gpio=None):
         self.gpio = gpio if gpio is not None else GpioMap("IoControl")
+        self.meters = {
+            4: S0Meter("HVAC-A Arbeiten + Schlafen"),
+            5: S0Meter("HVAC-B Wohnen + Essen"),
+            6: S0Meter("HVAC-C Mareike + Ralph"),
+            7: S0Meter("Außenbeleuchtung")
+        }
 
     async def timed_on(self, relais, duration):
         """Turn the relais on to a given time"""
@@ -42,10 +49,14 @@ class IoControl:
                 s0_index = event.s0_index
                 t_stamp = event.event.timestamp_ns
 
-                if s0_index in self.S0_DETECTOR:
+                if s0_index in self.S0_METER:
+                    #print(f"{t_stamp}: Received meter event #{s0_index}")
+                    meter = self.meters[s0_index]
+                    meter.pulse(t_stamp)
+                    print(meter)
+
+                elif s0_index in self.S0_DETECTOR:
                     print(f"{t_stamp}: Received detector event #{s0_index}")
-                elif s0_index in self.S0_METER:
-                    print(f"{t_stamp}: Received meter event #{s0_index}")
                 else:
                     print(f"{t_stamp}: Unmapped event #{s0_index}")
 
