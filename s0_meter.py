@@ -9,7 +9,8 @@ class S0Meter:
     """
     PULSE_PER_KWH = 2000
 
-    def __init__(self, total=0):
+    def __init__(self, name, total=0):
+        self.name = name
         self.total = total
         self.last_event = time.monotonic_ns()
         self.last_delta = 1
@@ -34,3 +35,7 @@ class S0Meter:
     def energy(self):
         """Get the consumed energy"""
         return self.total / self.PULSE_PER_KWH
+
+    def __str__(self):
+        """Pretty print the meter"""
+        return f"({self.name}: {self.power:4.0f}W, {self.energy}kwh"
