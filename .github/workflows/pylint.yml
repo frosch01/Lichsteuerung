@@ -21,4 +21,4 @@ jobs:
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
     - name: Analysing the code with pylint
       run: |
-        pylint gpio_map.py s0_meter.py io_control.py
+        pylint gpio_map.py s0_meter.py io_control.py timespan.py
