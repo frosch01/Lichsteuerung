@@ -1,4 +1,8 @@
-"""Map GPIO to installation and provide async interfaces to GPIO"""
+"""Provide async interfaces to GpioMap
+
+GpioMaps is mapping I/O pins to local indexes. This module provides a async
+based interface to control relais and handle incomping edge events.
+"""
 from enum import IntEnum
 import asyncio
 from gpio_map import GpioMap, RelaisState

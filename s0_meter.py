@@ -6,7 +6,12 @@ class S0Meter:
     """An energy meter based on a S0 interface
 
     Energy is determined by counting S0 edge events.
+
+    Arguments:
+        name (str): Gives the meter a name
+        total (int): Initial count
     """
+    # As given by specification of Eltaco
     PULSE_PER_KWH = 2000
 
     def __init__(self, name, total=0):
@@ -39,7 +44,10 @@ class S0Meter:
 
     @property
     def queue(self):
-        """The queue for pushing events to be counted"""
+        """The queue for pushing events to be counted
+
+        The objects expected to be pushed shall have type S0Event
+        """
         return self.event_queue
 
     async def handle_s0_events(self):
