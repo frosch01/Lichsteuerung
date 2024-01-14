@@ -1,33 +1,17 @@
 """Map GPIO to installation and provide async interfaces to GPIO"""
 import asyncio
-from gpio_map import GpioMap, Value, RelaisState
-from s0_meter import S0Meter
+from gpio_map import GpioMap
 
 
-class IoControl:
+class S0EventDispatcher:
     """Async interface to GPIO and adding of input/output functionality
 
     Arguments:
         gpio (GpioMap): GPIO abstraction to use for accessing shield
     """
-    S0_DETECTOR = set(range(0, 4))
-    S0_METER = set(range(4, 8))
-    RELAIS = set(range(8))
-
     def __init__(self, gpio=None):
-        self.gpio = gpio if gpio is not None else GpioMap("IoControl")
-        self.meters = {
-            4: S0Meter("HVAC-A Arbeiten + Schlafen"),
-            5: S0Meter("HVAC-B Wohnen + Essen"),
-            6: S0Meter("HVAC-C Mareike + Ralph"),
-            7: S0Meter("Außenbeleuchtung")
-        }
-
-    async def timed_on(self, relais, duration):
-        """Turn the relais on to a given time"""
-        self.gpio.set_relais(relais, Value(RelaisState.ON))
-        await asyncio.sleep(duration)
-        self.gpio.set_relais(relais, Value(RelaisState.OFF))
+        self.gpio = gpio if gpio is not None else GpioMap("S0EventDispatcher")
+        self.queues = [[] for s in range(len(gpio.S0_PINS))]
 
     async def handle_detector_events(self, wait_timeout=1):
         """Add this method to your asyncio loop to receive edge events
@@ -46,26 +30,9 @@ class IoControl:
                 self.gpio.read_input_events,
                 wait_timeout
             ):
-                s0_index = event.s0_index
-                t_stamp = event.event.timestamp_ns
+                for queue in self.queues[event.s0_index]:
+                    await queue.put(event)
 
-                if s0_index in self.S0_METER:
-                    #print(f"{t_stamp}: Received meter event #{s0_index}")
-                    meter = self.meters[s0_index]
-                    meter.pulse(t_stamp)
-                    print(meter)
-
-                elif s0_index in self.S0_DETECTOR:
-                    print(f"{t_stamp}: Received detector event #{s0_index}")
-                else:
-                    print(f"{t_stamp}: Unmapped event #{s0_index}")
-
-    async def relais_test(self):
-        """Run a simple test for all relais
-
-        Drive all relais at once and release them after time given by relais
-        index.
-        """
-        await asyncio.gather(
-            *list(map(lambda r: self.timed_on(r, r * 0.1 + 0.2), self.RELAIS))
-        )
+    def register_queue(self, s0_index, queue):
+        """Register a queue to push incoming S0 events"""
+        self.queues[s0_index].append(queue)
