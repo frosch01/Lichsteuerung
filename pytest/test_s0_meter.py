@@ -1,3 +1,4 @@
+import asyncio
 import mock
 import pytest
 import s0_meter
@@ -18,3 +19,17 @@ class TestS0Meter:
             assert meter.energy == 0.001
             mock_monotonic_ns.return_value = 4000000000 # 4.0s, delta 2s
             assert meter.power == 1800
+
+    @pytest.mark.asyncio
+    async def test_event_handler_wait(self):
+        meter = S0Meter("Test")
+        with pytest.raises(asyncio.exceptions.TimeoutError):
+            await asyncio.wait_for(meter.handle_s0_events(), timeout=1.0)
+
+    @pytest.mark.asyncio
+    async def test_event_handler_exec(self):
+        meter = S0Meter("Test")
+        with pytest.raises(asyncio.exceptions.TimeoutError):
+            await meter.queue.put(mock.Mock(event=mock.Mock(timestamp_ns=1e9)))
+            await asyncio.wait_for(meter.handle_s0_events(), timeout=1.0)
+        assert meter.total == 1
