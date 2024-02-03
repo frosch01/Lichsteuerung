@@ -1,90 +1,37 @@
-"""
-Access the relais, S0 inputs and PWM output of the LightControl HW
-"""
+"""Provide async interfaces to GpioMap
 
-# try:
-#    f = open('/sys/firmware/devicetree/base/model', 'r', encoding="ascii")
-# except OSError:
-#    print("No Raspberry PI detected. Running with stub GPIO")
-#    from GPIO_stub import GPIO
-# else:
-#    print(f"Raspberry PI model {f.readline()} detected. Running on real GPIO pins")
-
+GpioMaps is mapping I/O pins to local indexes. This module provides a async
+based interface to control relais and handle incomping edge events.
+"""
 from enum import IntEnum
 import asyncio
-import gpiod
-from gpiod.line import Direction, Value, Edge
-from rpi_hardware_pwm import HardwarePWM
-import version_check
-
-version_check.check_version(gpiod, "2.1.0")
+from gpio_map import GpioMap, RelaisState
+from timespan import Timespan
 
 
-class RelaisState(IntEnum):
-    """Assign names to relais states"""
-    ON = 0
-    OFF = 1
+class RelaisMode(IntEnum):
+    """Assign names to relais modes"""
+    OFF = 0
+    ON = 1
+    AUTO = 2
 
 
-class IoControl():
-    """Map HW design to RPI GPIOs"""
-    RELAIS_PINS = [18, 23, 24, 25, 12, 16, 20, 21]
-    DETECTOR_PINS = [4, 17, 27, 22]
-    METER_PINS = [5, 6, 19, 26]
-    PWM_CHANNELS = [(1, 2000)]  # Channel 1, 2000Hz
-    CHIP_PATH = "/dev/gpiochip0"
+class S0EventDispatcher:
+    """Async interface to GPIO and adding of input/output functionality
 
-    def __init__(self, consumer):
-        self.relais = gpiod.request_lines(
-            self.CHIP_PATH,
-            consumer=consumer,
-            config={
-                l: gpiod.LineSettings(
-                    direction=Direction.OUTPUT,
-                    output_value=Value(RelaisState.OFF))
-                for l in self.RELAIS_PINS
-            },
+    Arguments:
+        gpio (GpioMap): GPIO abstraction to use for accessing shield
+    """
+    def __init__(self, gpio=None, wait_timeout=1):
+        self.gpio = gpio if gpio is not None else GpioMap("S0EventDispatcher")
+        self.queues = [[] for s in range(len(gpio.S0_PINS))]
+        self.cancel = False
+        self.task = asyncio.create_task(
+            self.__handle_detector_events(wait_timeout),
+            name=self.__class__,
         )
 
-        self.s0s = gpiod.request_lines(
-            self.CHIP_PATH,
-            consumer=consumer,
-            config={l: gpiod.LineSettings(
-                edge_detection=Edge.RISING) for l in self.DETECTOR_PINS + self.METER_PINS},
-        )
-
-        self.dims = list(map(lambda x: HardwarePWM(*x), self.PWM_CHANNELS))
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exp_type, value, traceback):
-        self.relais.set_values({r: Value(RelaisState.OFF)
-                                for r in self.RELAIS_PINS})
-        list(map(lambda p: p.stop(), self.dims))
-        return exp_type is None
-
-    def set_relais(self, relais, state):
-        """Set the state of a relais"""
-        self.relais.set_value(self.RELAIS_PINS[relais], Value(state))
-
-    async def timed_on(self, relais, duration):
-        """Turn the relais on to a given time"""
-        self.relais.set_value(self.RELAIS_PINS[relais], Value(RelaisState.ON))
-        await asyncio.sleep(duration)
-        self.relais.set_value(self.RELAIS_PINS[relais], Value(RelaisState.OFF))
-
-    def set_pwm(self, pwm, value):
-        """Set the duty cycle of a PWM"""
-        self.dims[pwm].change_duty_cycle = int(value)
-
-    def __detector_event_thread(self, wait_timeout):
-        """Thread method for reading edge events from gpiod"""
-        if self.s0s.wait_edge_events(wait_timeout):
-            return self.s0s.read_edge_events()
-        return []
-
-    async def handle_detector_events(self, wait_timeout=1):
+    async def __handle_detector_events(self, wait_timeout=1):
         """Add this method to your asyncio loop to receive edge events
 
         For a proper exception handling, a future from this coroutine shall
@@ -94,29 +41,100 @@ class IoControl():
         handling.
         """
         loop = asyncio.get_running_loop()
-        while True:
+        while not self.cancel:
             # await handles exceptions and signals
             for event in await loop.run_in_executor(
                 None,
-                self.__detector_event_thread,
+                self.gpio.read_input_events,
                 wait_timeout
             ):
-                try:
-                    print(f"{event.timestamp_ns}: Received detector event "
-                          f"#{self.DETECTOR_PINS.index(event.line_offset)}")
-                except ValueError:
-                    pass
+                for queue in self.queues[event.s0_index]:
+                    await queue.put(event)
 
-                try:
-                    print(f"{event.timestamp_ns}: Received meter event "
-                          f"#{self.METER_PINS.index(event.line_offset)}")
-                except ValueError:
-                    pass
+    def register_queue(self, s0_index, queue):
+        """Register a queue to push incoming S0 events"""
+        self.queues[s0_index].append(queue)
 
-    async def relais_test(self):
-        """Test sequence for all relais. The on time is derived from the gpio offset"""
-        await asyncio.gather(
-            *list(
-                map(lambda r: self.timed_on(r, r), range(len(self.RELAIS_PINS)))
-            )
-        )
+
+class TimedRelais:
+    """Control a relais based on a on/off time schedule
+
+    This class makes use of asycio low level APIs to create the relais timing.
+    In order to synchronize with high level API, wait can be called.
+
+    Arguments:
+        name (str): Name for the devicd controlled by relais
+        gpio (GpioMap): Gpio to be used for controlling the relais
+        relais (int): Index of the relais inside gpio
+    """
+
+    RELAIS = range(len(GpioMap.RELAIS_PINS))
+
+    def __init__(self, name, gpio, relais):
+        self.name = name
+        self.gpio = gpio
+        self.timer = None
+        self.finished_event = asyncio.Event()
+        self.timespan = Timespan(asyncio.get_running_loop().time)
+        self.relais = relais
+        self._mode = RelaisMode.AUTO
+
+    def __repr__(self):
+        return f"({self.__class__.__module__}.{self.__class__.__qualname__} "\
+               f"name = {self.name}, "\
+               f"relais = {self.relais}, "\
+               f"timespan = {self.timespan})"
+
+    def set_mode(self, mode):
+        """Set the mode of the Relais"""
+        if self._mode != mode:
+            self._mode = mode
+            if self._mode == RelaisMode.ON:
+                self.gpio.set_relais(self.relais, RelaisState.ON)
+            elif self._mode == RelaisMode.OFF:
+                self.gpio.set_relais(self.relais, RelaisState.OFF)
+            elif self._mode == RelaisMode.AUTO:
+                self.gpio.set_relais(self.relais, RelaisState.OFF)
+
+    @property
+    def mode(self):
+        """Return the current mode of the relais"""
+        return self._mode
+
+    def timed_off_action(self):
+        """Turn the relais off, end of time-on-action"""
+        if self._mode == RelaisMode.AUTO:
+            self.gpio.set_relais(self.relais, RelaisState.OFF)
+        self.finished_event.set()
+
+    def timed_on_action(self):
+        """Turn the relais off, plan off action. Intermediate time-on-action"""
+        if self._mode == RelaisMode.AUTO:
+            self.gpio.set_relais(self.relais, RelaisState.ON)
+            loop = asyncio.get_running_loop()
+            self.timer = loop.call_at(
+                self.timespan.stop, self.timed_off_action)
+
+    def update(self, delay, duration):
+        """Update the pending action, create a new one if no one is running"""
+        self.timespan.update(delay, duration)
+        if self.timer is not None:
+            self.timer.cancel()
+        self.finished_event.clear()
+        loop = asyncio.get_running_loop()
+        self.timer = loop.call_at(self.timespan.start, self.timed_on_action)
+
+    async def wait(self):
+        """Synchronize with the running action to be finised"""
+        await self.finished_event.wait()
+
+    @classmethod
+    async def relais_test(cls, gpio):
+        """Drive all known relais once after the next for 0.5s
+
+        Instantiate this class for each known relais and call update() for
+        each instance.
+        """
+        relais = [cls(f"Test_{r}", gpio, r) for r in cls.RELAIS]
+        _ = list(map(lambda t: t[1].update(t[0], 0.5), enumerate(relais)))
+        await asyncio.gather(*[r.wait() for r in relais])

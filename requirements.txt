@@ -1,0 +1,4 @@
+rpi-hardware-pwm
+gpiod
+semver
+astral

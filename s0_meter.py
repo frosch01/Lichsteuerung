@@ -1,18 +1,26 @@
 """A simple meter based on S0 interface"""
 import time
-
+import asyncio
 
 class S0Meter:
     """An energy meter based on a S0 interface
 
     Energy is determined by counting S0 edge events.
+
+    Arguments:
+        name (str): Gives the meter a name
+        total (int): Initial count
     """
+    # As given by specification of Eltaco
     PULSE_PER_KWH = 1000
 
-    def __init__(self, total=0):
+    def __init__(self, name, total=0):
+        self.name = name
         self.total = total
         self.last_event = time.monotonic_ns()
         self.last_delta = 1
+        self.event_queue = asyncio.Queue()
+        self.task = asyncio.create_task(self.__handle_s0_events(), name=name)
 
     def pulse(self, timestamp):
         """Register last detected pulse with at time"""
@@ -34,3 +42,25 @@ class S0Meter:
     def energy(self):
         """Get the consumed energy"""
         return self.total / self.PULSE_PER_KWH
+
+    @property
+    def queue(self):
+        """The queue for pushing events to be counted
+
+        The objects expected to be pushed shall have type S0Event
+        """
+        return self.event_queue
+
+    async def __handle_s0_events(self):
+        """Receive S0 events from a queue and digest
+
+        This method handles events in a loop. It'll not return.
+        """
+        while True:
+            event = await self.event_queue.get()
+            self.pulse(event.event.timestamp_ns)
+            print(self)
+
+    def __str__(self):
+        """Pretty print the meter"""
+        return f"({self.name}: {self.power:4.0f}W, {self.energy}kwh"
