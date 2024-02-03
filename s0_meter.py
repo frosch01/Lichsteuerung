@@ -20,6 +20,7 @@ class S0Meter:
         self.last_event = time.monotonic_ns()
         self.last_delta = 1
         self.event_queue = asyncio.Queue()
+        self.task = asyncio.create_task(self.__handle_s0_events(), name=name)
 
     def pulse(self, timestamp):
         """Register last detected pulse with at time"""
@@ -50,7 +51,7 @@ class S0Meter:
         """
         return self.event_queue
 
-    async def handle_s0_events(self):
+    async def __handle_s0_events(self):
         """Receive S0 events from a queue and digest
 
         This method handles events in a loop. It'll not return.

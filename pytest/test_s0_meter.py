@@ -5,7 +5,8 @@ import s0_meter
 from s0_meter import S0Meter
 
 class TestS0Meter:
-    def test_increment(self):
+    @pytest.mark.asyncio
+    async def test_increment(self):
         with mock.patch.object(s0_meter.time, 'monotonic_ns') as mock_monotonic_ns:
             mock_monotonic_ns.return_value = 1000000000 # 1s
             meter = S0Meter("Test")
@@ -19,14 +20,21 @@ class TestS0Meter:
             assert meter.energy == 0.0005
             mock_monotonic_ns.return_value = 4000000000 # 4.0s, delta 2s
             assert meter.power == 900
+            # Graceful shutdown...
+            with pytest.raises(asyncio.exceptions.CancelledError):
+                meter.task.cancel()
+                await asyncio.wait_for(meter.task, timeout=1.0)
+
+    @pytest.mark.asyncio
+    async def test_backgroud_task_running(self):
         meter = S0Meter("Test")
         with pytest.raises(asyncio.exceptions.TimeoutError):
-            await asyncio.wait_for(meter.handle_s0_events(), timeout=1.0)
+            await asyncio.wait_for(meter.task, timeout=1.0)
 
     @pytest.mark.asyncio
     async def test_event_handler_exec(self):
         meter = S0Meter("Test")
         with pytest.raises(asyncio.exceptions.TimeoutError):
             await meter.queue.put(mock.Mock(event=mock.Mock(timestamp_ns=1e9)))
-            await asyncio.wait_for(meter.handle_s0_events(), timeout=1.0)
+            await asyncio.wait_for(meter.task, timeout=1.0)
         assert meter.total == 1

@@ -22,11 +22,16 @@ class S0EventDispatcher:
     Arguments:
         gpio (GpioMap): GPIO abstraction to use for accessing shield
     """
-    def __init__(self, gpio=None):
+    def __init__(self, gpio=None, wait_timeout=1):
         self.gpio = gpio if gpio is not None else GpioMap("S0EventDispatcher")
         self.queues = [[] for s in range(len(gpio.S0_PINS))]
+        self.cancel = False
+        self.task = asyncio.create_task(
+            self.__handle_detector_events(wait_timeout),
+            name=self.__class__,
+        )
 
-    async def handle_detector_events(self, wait_timeout=1):
+    async def __handle_detector_events(self, wait_timeout=1):
         """Add this method to your asyncio loop to receive edge events
 
         For a proper exception handling, a future from this coroutine shall
@@ -36,7 +41,7 @@ class S0EventDispatcher:
         handling.
         """
         loop = asyncio.get_running_loop()
-        while True:
+        while not self.cancel:
             # await handles exceptions and signals
             for event in await loop.run_in_executor(
                 None,
