@@ -23,7 +23,6 @@ class SunEvent:
     event_time: datetime
     now: datetime
 
-
 class SunSensor:
     """Timed daylight "sensor" based on geo coordinates"""
     def __init__(self, polling_interval=timedelta(days=1)):
@@ -71,11 +70,7 @@ class SunSensor:
         self.wait_event = asyncio.Event()
 
         # Push event to queues
-        for queue in self.queues:
-            try:
-                queue.put_nowait(self.cur_event)
-            except asyncio.QueueFull:
-                print(f"{self.__class__}: Queue overrunn")
+        self.send_event(self.cur_event)
 
         # Sleep till next event, plan with some clock drift
         sleep_duration = min(tt_rise, tt_set, self.polling_interval).total_seconds()
@@ -94,3 +89,25 @@ class SunSensor:
     def register_queue(self, queue):
         """Register a queue to receive sunrise/sunset events"""
         self.queues.append(queue)
+
+    def send_event(self, event):
+        """Push event into registered queues"""
+        for queue in self.queues:
+            try:
+                queue.put_nowait(event)
+            except asyncio.QueueFull:
+                print(f"{self.__class__}: Queue overrun")
+
+    def send_event_type(self, event_type, now=None):
+        """Force sending of an event of given type
+
+        The event time is selected from passed now and may by in the future
+        or the past relative to passed now.
+        """
+        now = datetime.now(self.tzinfo) if now is None else now
+        match event_type:
+            case SunEventType.SUN_SET:
+                event_time = sun.sunset(self.home, now, self.tzinfo)
+            case SunEventType.SUN_RISE:
+                event_time = sun.sunrise(self.home, now, self.tzinfo)
+        self.send_event(SunEvent(event_type, event_time, now))

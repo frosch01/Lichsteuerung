@@ -63,4 +63,7 @@ class S0Meter:
 
     def __str__(self):
         """Pretty print the meter"""
-        return f"({self.name}: {self.power:4.0f}W, {self.energy}kwh"
+        return f"({self.name}: {self.power:4.0f}W, {self.energy}kwh)"
+
+    def __repr__(self):
+        return self.__str__()

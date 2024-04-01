@@ -58,6 +58,10 @@ class GpioMap():
             },
         )
 
+        # Shadow of release states. The state of an GPIO ouput can not be read
+        # using gpiod.
+        self.relais_states = [RelaisState.OFF] * len(self.RELAIS_PINS)
+
         self.s0s = gpiod.request_lines(
             self.CHIP_PATH,
             consumer=consumer,
@@ -85,7 +89,19 @@ class GpioMap():
         relais (int): Index of the Relais, see self.RELAIS_PINS
         state (RelaisState): RelaisState.ON or RelaisState.OFF
         """
+        self.relais_states[relais] = state
         self.relais.set_value(self.RELAIS_PINS[relais], Value(state))
+
+    def get_relais(self, relais):
+        """Get the state of a relais
+
+        The output state can not be queried from gpiod. The state is
+        tracked in a instance variable to enable state query.
+
+        Arguments:
+        relais (int): Index of the Relais, see self.RELAIS_PINS
+        """
+        return self.relais_states[relais]
 
     def set_pwm(self, pwm, value):
         """Set the duty cycle of a PWM

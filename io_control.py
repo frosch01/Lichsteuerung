@@ -5,8 +5,9 @@ based interface to control relais and handle incomping edge events.
 """
 from enum import IntEnum
 import asyncio
-from gpio_map import GpioMap, RelaisState
+from gpio_map import GpioMap, RelaisState, S0Event
 from timespan import Timespan
+from sun import SunEvent, SunEventType
 
 
 class RelaisMode(IntEnum):
@@ -85,7 +86,13 @@ class TimedRelais:
                f"relais = {self.relais}, "\
                f"timespan = {self.timespan})"
 
-    def set_mode(self, mode):
+    @property
+    def mode(self):
+        """Return the current mode of the relais"""
+        return self._mode
+
+    @mode.setter
+    def mode(self, mode):
         """Set the mode of the Relais"""
         if self._mode != mode:
             self._mode = mode
@@ -97,9 +104,9 @@ class TimedRelais:
                 self.gpio.set_relais(self.relais, RelaisState.OFF)
 
     @property
-    def mode(self):
-        """Return the current mode of the relais"""
-        return self._mode
+    def state(self):
+        """Return the current state of the relais"""
+        return self.gpio.get_relais(self.relais)
 
     def timed_off_action(self):
         """Turn the relais off, end of time-on-action"""
@@ -138,3 +145,58 @@ class TimedRelais:
         relais = [cls(f"Test_{r}", gpio, r) for r in cls.RELAIS]
         _ = list(map(lambda t: t[1].update(t[0], 0.5), enumerate(relais)))
         await asyncio.gather(*[r.wait() for r in relais])
+
+
+class S0Detector():
+    """Control a set of relais on receiving S0Event
+
+    Receive Events from S0 inputs. As a event occurs, trigger TimedRelais from
+    a list given when ínstantiating. The detector uses a queue, read in an
+    async task for receiving events.
+
+    An S0Detector can be masked, means it is no longer reacting to incoming
+    S0Events. The masking is set/unset automatically based on incomiung
+    SUN_SET/SUN_RISE events.
+    """
+    def __init__(self, name, relais_trigger):
+        self.name = name
+        self.event_queue = asyncio.Queue()
+        self.trigger = relais_trigger
+        self.task = asyncio.create_task(self.__handle_s0_events(), name=name)
+        self.cancel = False
+        self.mask = False
+
+    async def __handle_s0_events(self):
+        while not self.cancel:
+            event = await self.event_queue.get()
+            match event:
+                case S0Event():
+                    if not self.mask:
+                        for relais, delay, duration in self.trigger:
+                            relais.update(delay, duration)
+                case SunEvent():
+                    match event.type:
+                        case SunEventType.SUN_RISE:
+                            self.mask = True
+                            for relais, _, _ in self.trigger:
+                                relais.mode = RelaisMode.AUTO
+                        case SunEventType.SUN_SET:
+                            self.mask = False
+
+    @property
+    def mask(self):
+        """Return the mask state"""
+        return self.__masked
+
+    @mask.setter
+    def mask(self, other):
+        """Set the mask state"""
+        self.__masked = other
+
+    @property
+    def queue(self):
+        """The queue for pushing events to an instance
+
+        The events expected to be pushed shall have types S0Event or SunEvent
+        """
+        return self.event_queue
