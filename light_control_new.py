@@ -5,7 +5,7 @@ from io_control import S0EventDispatcher, TimedRelais, S0Detector, RelaisMode, R
 from s0_meter import S0Meter
 from gpio_map import GpioMap
 from sun import SunSensor
-
+from app_state import AppState
 
 class LightControl:
     """Defines the behavior of the light installation.
@@ -41,11 +41,12 @@ class LightControl:
             lamp_terrasse = TimedRelais("Lampe Terasse", gpio, 2)
             lamp_garage = TimedRelais("Lampe Garage", gpio, 3)
 
+            app_state = AppState("/var/lib/light-control/state.json")
             meters = (
-                (4, S0Meter("HVAC-A Arbeiten + Schlafen")),
-                (5, S0Meter("HVAC-B Wohnen + Essen")),
-                (6, S0Meter("HVAC-C Mareike + Ralph")),
-                (7, S0Meter("Außenbeleuchtung"))
+                (4, S0Meter("HVAC-A Arbeiten + Schlafen", app_state)),
+                (5, S0Meter("HVAC-B Wohnen + Essen", app_state)),
+                (6, S0Meter("HVAC-C Mareike + Ralph", app_state)),
+                (7, S0Meter("Außenbeleuchtung", app_state))
             )
 
             for s0_index, meter in meters:
@@ -106,7 +107,16 @@ class LightControl:
             # Wait forever. This ensures a nice nice termination when
             # exectuting from nicegui
             while True:
-                await asyncio.sleep(1)
+                try:
+                    # Save the state daily
+                    await asyncio.sleep(84600)
+                except asyncio.exceptions.CancelledError as err:
+                    raise err
+                finally:
+                    # This is execued in any case before try block exits
+                    # Exception is raised after finally!!!
+                    print("Storing light-control state")
+                    app_state.store_state()
 
     def set_relais_mode(self, name, ui_mode):
         """UI setter for relais mode"""

@@ -1,8 +1,9 @@
 """A simple meter based on S0 interface"""
 import time
 import asyncio
+from app_state import State, Stateful
 
-class S0Meter:
+class S0Meter(Stateful):
     """An energy meter based on a S0 interface
 
     Energy is determined by counting S0 edge events.
@@ -14,13 +15,26 @@ class S0Meter:
     # As given by specification of Eltaco
     PULSE_PER_KWH = 2000
 
-    def __init__(self, name, total=0):
+    def __init__(self, name, app_state):
         self.name = name
-        self.total = total
+        self.total = 0
         self.last_event = time.monotonic_ns()
         self.last_delta = 1
         self.event_queue = asyncio.Queue()
         self.task = asyncio.create_task(self.__handle_s0_events(), name=name)
+        self._register_state(app_state)
+
+    def _register_state(self, app_state):
+        state = app_state.get_state(self.name)
+        if state is not None:
+            self.total = state.state["total"]
+            assert isinstance(self.total, int)
+        app_state.register_client(self)
+
+    @property
+    def state(self):
+        """Return the app_state State of the instance"""
+        return State(self.name, {"total": self.total})
 
     def pulse(self, timestamp):
         """Register last detected pulse with at time"""
@@ -42,6 +56,15 @@ class S0Meter:
     def energy(self):
         """Get the consumed energy"""
         return self.total / self.PULSE_PER_KWH
+
+    @energy.setter
+    def energy(self, value):
+        """Set the consumed energy (calibration)"""
+        self.total = int(value * self.PULSE_PER_KWH)
+
+    def set_energy(self, value):
+        """Set the consumed energy (calibration)"""
+        self.energy = value
 
     @property
     def queue(self):
