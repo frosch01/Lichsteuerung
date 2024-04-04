@@ -6,6 +6,13 @@ from sun import SunEvent, SunEventType
 
 light_control = LightControl()
 
+def update_calib(event):
+    if event.value:
+        ui_calib_hvac_a.value = light_control.meters['hvac-a'].energy
+        ui_calib_hvac_b.value = light_control.meters['hvac-b'].energy
+        ui_calib_hvac_c.value = light_control.meters['hvac-c'].energy
+        ui_calib_light.value = light_control.meters['light'].energy
+
 with ui.tabs() as tabs:
     light = ui.tab('Licht')
     detector = ui.tab('Melder')
@@ -76,6 +83,18 @@ with ui.tab_panels(tabs, value=light):
                     ui.label("W")
                 ui_light_power.disable()
                 ui_light_energy = ui.label("0 kwh").style('color: #6E93D6; font-size: 200%; font-weight: 500')
+
+        with ui.card().classes('p-1 m-1 gap-1'):
+            ui_calib_cb = ui.checkbox("Kalibrierung", on_change = update_calib)
+            with ui.grid(columns=2).bind_visibility_from(ui_calib_cb, 'value'):
+                ui.label("Zähler links")
+                ui_calib_hvac_c = ui.number(label="HVAC-C", format='%.2f', on_change=lambda e: light_control.meters['hvac-c'].set_energy(e.value))
+                ui.label("Zähler mitte")
+                ui_calib_hvac_b = ui.number(label="HVAC-B", format='%.2f', on_change=lambda e: light_control.meters['hvac-b'].set_energy(e.value))
+                ui.label("Zähler rechts")
+                ui_calib_hvac_a = ui.number(label="HVAC-A", format='%.2f', on_change=lambda e: light_control.meters['hvac-a'].set_energy(e.value))
+                ui.label("Zähler Licht")
+                ui_calib_light = ui.number(label="Licht", format='%.2f', on_change=lambda e: light_control.meters['light'].set_energy(e.value))
 
         #with ui.card():
             #columns = [
