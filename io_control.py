@@ -200,3 +200,49 @@ class S0Detector():
         The events expected to be pushed shall have types S0Event or SunEvent
         """
         return self.event_queue
+
+class Dimmer:
+    """Control a (the one) dimming output"""
+    def __init__(self, name, gpio, pwm=0):
+        self.name = name
+        self.gpio = gpio
+        self.pwm = pwm
+        self.duty = 100
+        self.event_queue = asyncio.Queue()
+        self.cancel = False
+        self.task = asyncio.create_task(self.__handle_events(), name=name)
+
+    @property
+    def duty(self):
+        """Return the duty cycle"""
+        return self.__duty
+
+    @duty.setter
+    def duty(self, duty):
+        """Set the duty cycle"""
+        # limit the range....
+        self.__duty = min(100, max(0, duty))
+        self.gpio.set_pwm(self.pwm, self.__duty)
+
+    def set_duty(self, duty):
+        """Set the duty cycle"""
+        self.duty = duty
+
+    @property
+    def queue(self):
+        """Queue for pushing events to an instance
+
+        Only SunEvents are expected....
+        """
+        return self.event_queue
+
+    async def __handle_events(self):
+        while not self.cancel:
+            event = await self.event_queue.get()
+            match event:
+                case SunEvent():
+                    match event.type:
+                        case SunEventType.SUN_RISE:
+                            self.duty = 100
+                        case SunEventType.SUN_SET:
+                            pass

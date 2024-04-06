@@ -35,7 +35,7 @@ with ui.tab_panels(tabs, value=light):
             with ui.row():
                 ui_lamp_terrace_state = ui.icon('light_mode', color='gray', size='32px').classes('text-5xl')
                 ui_lamp_terrace_mode = ui.toggle({1: 'auto', 2: 'on', 3: 'off'}, value=1, on_change=lambda e: light_control.set_relais_mode('terrasse', e.value)).props('inline')
-            ui.slider(min=10, max=100, value=100)
+            ui_dim_terrace = ui.slider(min=10, max=100, value=100, on_change=lambda e: light_control.dim.set_duty(e.value))
         with ui.card():
             ui.label("Lampe Garage").props('inline')
             with ui.row():
@@ -141,6 +141,7 @@ def update_ui():
         ui_hvac_c_energy.set_text(f"{round(light_control.meters['hvac-c'].energy, 2)}kwh")
         ui_light_power.set_value(round(light_control.meters["light"].power))
         ui_light_energy.set_text(f"{round(light_control.meters['light'].energy, 2)}kwh")
+        ui_dim_terrace.set_value(light_control.dim.duty)
     except KeyError:
         pass
 

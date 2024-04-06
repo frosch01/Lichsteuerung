@@ -1,7 +1,7 @@
 """I/O instantiation reflecting the installation"""
 
 import asyncio
-from io_control import S0EventDispatcher, TimedRelais, S0Detector, RelaisMode, RelaisState
+from io_control import S0EventDispatcher, TimedRelais, S0Detector, RelaisMode, RelaisState, Dimmer
 from s0_meter import S0Meter
 from gpio_map import GpioMap
 from sun import SunSensor
@@ -20,6 +20,7 @@ class LightControl:
         self.detectors = {}
         self.meters = {}
         self.sun = None
+        self.dim = None
 
     async def io_main(self):
         """I/O main routine to be used from nicegui
@@ -82,6 +83,9 @@ class LightControl:
                 s0ed.register_queue(s0_index, detector.queue)
                 sun.register_queue(detector.queue)
 
+            dim = Dimmer("Dimmer Terrasse", gpio)
+            sun.register_queue(dim.queue)
+
             self.lamps = {
                 "yard_front": lamp_yard_front,
                 "yard_rear": lamp_yard_rear,
@@ -103,6 +107,7 @@ class LightControl:
             }
 
             self.sun = sun
+            self.dim = dim
 
             # Wait forever. This ensures a nice nice termination when
             # exectuting from nicegui
