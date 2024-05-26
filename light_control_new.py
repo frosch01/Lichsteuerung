@@ -55,24 +55,24 @@ class LightControl:
 
             detectors = (
                 (0, S0Detector("Melder Einfahrt", (
-                        (lamp_terrasse, 4, 120),
-                        (lamp_yard_rear, 0, 60),
-                        (lamp_yard_front, 2, 180),
-                        (lamp_garage, 6, 120),
+                        (lamp_terrasse, 4, 600),
+                        (lamp_yard_rear, 2, 300),
+                        (lamp_yard_front, 0, 900),
+                        (lamp_garage, 6, 600),
                     )
                 )),
                 (1, S0Detector("Melder Terasse", (
-                        (lamp_terrasse, 0, 120),
-                        (lamp_yard_rear, 5, 60),
-                        (lamp_yard_front, 3, 60),
-                        (lamp_garage, 5, 60),
+                        (lamp_terrasse, 0, 600),
+                        #(lamp_yard_rear, 5, 300),
+                        #(lamp_yard_front, 3, 300),
+                        #(lamp_garage, 5, 300),
                     )
                 )),
                 (2, S0Detector("Melder Garage", (
-                        (lamp_terrasse, 3, 120),
+                        (lamp_terrasse, 3, 600),
                         #(lamp_yard_rear, 3, 10),
-                        (lamp_yard_front, 5, 120),
-                        (lamp_garage, 0, 180),
+                        #(lamp_yard_front, 5, 600),
+                        (lamp_garage, 0, 900),
                     )
                 )),
             )
