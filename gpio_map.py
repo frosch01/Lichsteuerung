@@ -8,6 +8,7 @@ import gpiod
 from gpiod.line import Direction, Value, Edge
 from gpiod import EdgeEvent
 from rpi_hardware_pwm import HardwarePWM
+import RPi.version
 import version_check
 
 version_check.check_version(gpiod, "2.1.0")
@@ -41,7 +42,10 @@ class GpioMap():
         consumer (str): Name of application registered with gpiod
     """
     RELAIS_PINS = (18, 23, 24, 25, 12, 16, 20, 21)
-    S0_PINS = (4, 17, 27, 22, 5, 6, 19, 26)
+    if RPi.version.board_type.startswith("Zero"):
+        S0_PINS = ( 4, 17, 27, 22, 5, 6, 19, 26)
+    else:
+        S0_PINS = (15, 17, 27, 22, 5, 6, 19, 26)
     PWM_CHANNELS = ((1, 2000),)  # Channel 1, 2000Hz
     CHIP_PATH = "/dev/gpiochip0"
     S0_INDEX_LOOKUP = dict(zip(S0_PINS, range(len(S0_PINS))))
