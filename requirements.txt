@@ -2,3 +2,6 @@ rpi-hardware-pwm
 gpiod
 semver
 astral
+nicegui
+RPi.version
+
