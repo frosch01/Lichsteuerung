@@ -1,0 +1,15 @@
+[project]
+name = "lichtsteuerung"
+version = "0.1.0"
+description = "Control outside lights with motion detector"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "aiomqtt>=2.4.0",
+    "astral>=3.2",
+    "gpiod>=2.4.0",
+    "nicegui>=3.4.1",
+    "rpi-hardware-pwm>=0.3.0",
+    "rpi-version>=2.0",
+    "semver>=3.0.4",
+]
