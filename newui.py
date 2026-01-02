@@ -4,8 +4,6 @@ from nicegui.events import ValueChangeEventArguments
 from light_control_new import LightControl
 from sun import SunEvent, SunEventType
 
-light_control = LightControl()
-
 def update_calib(event):
     if event.value:
         ui_calib_hvac_a.value = light_control.meters['hvac-a'].energy
@@ -148,7 +146,15 @@ def update_ui():
 async def light_control_main():
     await light_control.io_main()
 
-app.on_startup(light_control_main)
+
+# MAGIC...
+# The code found herein is NOT MAIN. The complete module is based on local
+# storage and everything is re-constructed as browser reloads. To make
+# LightControl instance persisten, it is created as part of app object.
+if not app.is_started:
+    app.light_control = LightControl()
+    app.on_startup(light_control_main)
+light_control = app.light_control
 
 ui.timer(1.0, update_ui)
 ui.run(binding_refresh_interval=1, show=False, on_air=False, reload=False)
