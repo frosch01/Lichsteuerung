@@ -3,8 +3,10 @@
 GpioMaps is mapping I/O pins to local indexes. This module provides a async
 based interface to control relais and handle incomping edge events.
 """
-from enum import IntEnum
 import asyncio
+from enum import IntEnum
+from dataclasses import dataclass
+
 from gpio_map import GpioMap, RelaisState, S0Event
 from timespan import Timespan
 from sun import SunEvent, SunEventType
@@ -147,6 +149,14 @@ class TimedRelais:
         await asyncio.gather(*[r.wait() for r in relais])
 
 
+@dataclass
+class DetectorEvent:
+    """Event as provided by a detector"""
+    name: str
+    s0: int
+    gpio: int
+    timestamp: int
+
 class S0Detector():
     """Control a set of relais on receiving S0Event
 
@@ -154,17 +164,26 @@ class S0Detector():
     a list given when ínstantiating. The detector uses a queue, read in an
     async task for receiving events.
 
+    TODO: It would be a better design to do the detector job only and emit a
+          signal that is catched by the TimedRelais. The timed Relais would
+          run own event handler in this case.
+
+          Emitting output signal when triggered is already done in behlaf of
+          MQTT integration.
+
     An S0Detector can be masked, means it is no longer reacting to incoming
     S0Events. The masking is set/unset automatically based on incomiung
     SUN_SET/SUN_RISE events.
     """
-    def __init__(self, name, relais_trigger):
+    def __init__(self, name, event_name, relais_trigger):
         self.name = name
+        self.event_name = event_name
         self.event_queue = asyncio.Queue()
         self.trigger = relais_trigger
         self.task = asyncio.create_task(self.__handle_s0_events(), name=name)
         self.cancel = False
         self.mask = False
+        self.queues = []
 
     async def __handle_s0_events(self):
         while not self.cancel:
@@ -174,6 +193,10 @@ class S0Detector():
                     if not self.mask:
                         for relais, delay, duration in self.trigger:
                             relais.update(delay, duration)
+                        self._send_event(DetectorEvent(
+                            self.event_name, event.s0_index, event.event.line_offset, event.event.timestamp_ns
+                        ))
+
                 case SunEvent():
                     match event.type:
                         case SunEventType.SUN_RISE:
@@ -182,6 +205,14 @@ class S0Detector():
                                 relais.mode = RelaisMode.AUTO
                         case SunEventType.SUN_SET:
                             self.mask = False
+
+    def _send_event(self, event: DetectorEvent):
+        """Push event to all registered queues"""
+        for queue in self.queues:
+            try:
+                queue.put_nowait(event)
+            except asyncio.QueueFull:
+                print(f"{self.__class__}: Queue overrun")
 
     @property
     def mask(self):
@@ -195,11 +226,16 @@ class S0Detector():
 
     @property
     def queue(self):
-        """The queue for pushing events to an instance
+        """The queue for receiving (incoming) S0 or Sun events
 
         The events expected to be pushed shall have types S0Event or SunEvent
         """
         return self.event_queue
+
+    def register_queue(self, queue):
+        """Register a queue for sending (outgoing) detector events"""
+        self.queues.append(queue)
+
 
 class Dimmer:
     """Control a (the one) dimming output"""

@@ -6,6 +6,8 @@ from s0_meter import S0Meter
 from gpio_map import GpioMap
 from sun import SunSensor
 from app_state import AppState
+from mqtt_if import MqttIf
+
 
 class LightControl:
     """Defines the behavior of the light installation.
@@ -21,6 +23,7 @@ class LightControl:
         self.meters = {}
         self.sun = None
         self.dim = None
+        self.app_state = None
 
     async def io_main(self):
         """I/O main routine to be used from nicegui
@@ -32,6 +35,9 @@ class LightControl:
         async sleeps forever. This ensures a graceful termination in
         interaction with nicegui
         """
+        print("I/O main running")
+
+        mqtt_if = MqttIf()
 
         with GpioMap("light_control") as gpio:
 
@@ -42,33 +48,33 @@ class LightControl:
             lamp_terrasse = TimedRelais("Lampe Terasse", gpio, 2)
             lamp_garage = TimedRelais("Lampe Garage", gpio, 3)
 
-            app_state = AppState("/var/lib/light-control/state.json")
+            self.app_state = AppState("/var/lib/light-control/state.json")
             meters = (
-                (4, S0Meter("HVAC-A Arbeiten + Schlafen", app_state)),
-                (5, S0Meter("HVAC-B Wohnen + Essen", app_state)),
-                (6, S0Meter("HVAC-C Mareike + Ralph", app_state)),
-                (7, S0Meter("Außenbeleuchtung", app_state))
+                (4, S0Meter("HVAC-A Arbeiten + Schlafen", self.app_state)),
+                (5, S0Meter("HVAC-B Wohnen + Essen", self.app_state)),
+                (6, S0Meter("HVAC-C Mareike + Ralph", self.app_state)),
+                (7, S0Meter("Außenbeleuchtung", self.app_state))
             )
 
             for s0_index, meter in meters:
                 s0ed.register_queue(s0_index, meter.queue)
 
             detectors = (
-                (0, S0Detector("Melder Einfahrt", (
+                (0, S0Detector("Melder Einfahrt", "yard", (
                         (lamp_terrasse, 4, 600),
                         (lamp_yard_rear, 2, 300),
                         (lamp_yard_front, 0, 900),
                         (lamp_garage, 6, 600),
                     )
                 )),
-                (1, S0Detector("Melder Terasse", (
+                (1, S0Detector("Melder Terrasse", "terrace", (
                         (lamp_terrasse, 0, 600),
                         #(lamp_yard_rear, 5, 300),
                         #(lamp_yard_front, 3, 300),
                         #(lamp_garage, 5, 300),
                     )
                 )),
-                (2, S0Detector("Melder Garage", (
+                (2, S0Detector("Melder Garage", "garage", (
                         (lamp_terrasse, 3, 600),
                         #(lamp_yard_rear, 3, 10),
                         #(lamp_yard_front, 5, 600),
@@ -81,6 +87,7 @@ class LightControl:
 
             for s0_index, detector in detectors:
                 s0ed.register_queue(s0_index, detector.queue)
+                detector.register_queue(mqtt_if.queue)
                 sun.register_queue(detector.queue)
 
             dim = Dimmer("Dimmer Terrasse", gpio)
@@ -111,17 +118,23 @@ class LightControl:
 
             # Wait forever. This ensures a nice nice termination when
             # exectuting from nicegui
-            while True:
-                try:
-                    # Save the state daily
-                    await asyncio.sleep(84600)
-                except asyncio.exceptions.CancelledError as err:
-                    raise err
-                finally:
-                    # This is execued in any case before try block exits
-                    # Exception is raised after finally!!!
-                    print("Storing light-control state")
-                    app_state.store_state()
+            await asyncio.gather(
+                self._store_settings(),
+                mqtt_if.main(),
+            )
+
+    async def _store_settings(self):
+        while True:
+            try:
+                # Save the state daily
+                await asyncio.sleep(84600)
+            except asyncio.exceptions.CancelledError as err:
+                raise err
+            finally:
+                # This is execued in any case before try block exits
+                # Exception is raised after finally!!!
+                print("Storing light-control state")
+                self.app_state.store_state()
 
     def set_relais_mode(self, name, ui_mode):
         """UI setter for relais mode"""
