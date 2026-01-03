@@ -81,12 +81,25 @@ class TimedRelais:
         self.timespan = Timespan(asyncio.get_running_loop().time)
         self.relais = relais
         self._mode = RelaisMode.AUTO
+        self._event_queue = asyncio.Queue()
+        self._task = asyncio.create_task(self.__handle_s0_events(), name=name)
 
     def __repr__(self):
         return f"({self.__class__.__module__}.{self.__class__.__qualname__} "\
                f"name = {self.name}, "\
                f"relais = {self.relais}, "\
                f"timespan = {self.timespan})"
+
+    async def __handle_s0_events(self):
+        while True:
+            event = await self._event_queue.get()
+            match event:
+                case SunEvent():
+                    match event.type:
+                        case SunEventType.SUN_RISE:
+                            self.mode = RelaisMode.OFF
+                        case SunEventType.SUN_SET:
+                            self.mode = RelaisMode.AUTO
 
     @property
     def mode(self):
@@ -104,6 +117,14 @@ class TimedRelais:
                 self.gpio.set_relais(self.relais, RelaisState.OFF)
             elif self._mode == RelaisMode.AUTO:
                 self.gpio.set_relais(self.relais, RelaisState.OFF)
+
+    @property
+    def queue(self):
+        """The queue for receiving (incoming) S0 or Sun events
+
+        The events expected to be pushed shall have types S0Event or SunEvent
+        """
+        return self._event_queue
 
     @property
     def state(self):
@@ -200,9 +221,7 @@ class S0Detector():
                 case SunEvent():
                     match event.type:
                         case SunEventType.SUN_RISE:
-                            self.mask = True
-                            for relais, _, _ in self.trigger:
-                                relais.mode = RelaisMode.AUTO
+                            self.mask = False
                         case SunEventType.SUN_SET:
                             self.mask = False
 

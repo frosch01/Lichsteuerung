@@ -85,6 +85,9 @@ class LightControl:
 
             sun = SunSensor()
 
+            for lamp in (lamp_yard_front, lamp_yard_rear, lamp_terrasse, lamp_garage):
+                sun.register_queue(lamp.queue)
+
             for s0_index, detector in detectors:
                 s0ed.register_queue(s0_index, detector.queue)
                 detector.register_queue(mqtt_if.queue)
