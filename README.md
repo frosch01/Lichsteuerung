@@ -14,6 +14,17 @@ gpio=12,16,18,20,21,23,24,25=op,dh
 
 ```
 
+For development, not using a PI Zero, a different IO setup is in use as Pins
+of newer PI designs is different and there is a line collision with EPROM.
+
+```
+echo "
+# GPIO and PWM configuration for S0 shield
+dtoverlay=pwm,pin=13,func=4,clock=500000
+gpio=15,5,6,17,19,22,26,27=ip,pu
+gpio=12,16,18,20,21,23,24,25=op,dh
+" | sudo tee -a /boot/config.txt
+```
 
 ## Amount of Meter Pulses per year
 
