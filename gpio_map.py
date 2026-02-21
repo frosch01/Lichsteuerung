@@ -2,6 +2,8 @@
 Map the relais, S0 inputs and PWM output of the I/O Shield
 """
 
+import time
+import sys
 from enum import IntEnum
 from dataclasses import dataclass
 import gpiod
@@ -74,7 +76,17 @@ class GpioMap():
                 edge_detection=Edge.RISING) for l in self.S0_PINS},
         )
 
-        self.pwms = list(map(lambda p: HardwarePWM(*p), self.PWM_CHANNELS))
+        n_retries = 3
+        for retry in range(n_retries):
+            try:
+                self.pwms = list(map(lambda p: HardwarePWM(*p), self.PWM_CHANNELS))
+            except PermissionError as excp:
+                if retry == n_retries - 1:
+                    raise excp
+                time.sleep(0.5)
+            else:
+                break
+
         for pwm in self.pwms:
             pwm.start(100)
 
