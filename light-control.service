@@ -6,8 +6,8 @@ After=network.target
 [Service]
 Type=simple
 User=ralph
-WorkingDirectory=/home/ralph
-ExecStart=python /home/ralph/Lichtsteuerung/newui.py
+WorkingDirectory=/home/ralph/Lichtsteuerung
+ExecStart=uv run /home/ralph/Lichtsteuerung/newui.py
 Restart=on-failure
 
 [Install]
