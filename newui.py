@@ -1,3 +1,4 @@
+import datetime
 import asyncio
 from nicegui import app, ui
 from nicegui.events import ValueChangeEventArguments
@@ -51,8 +52,11 @@ def root():
 
     with ui.tabs() as tabs:
         light = ui.tab('Licht')
+        wau = ui.tab('Fluffy')
         detector = ui.tab('Melder')
-        energy = ui.tab('Energie')
+        hvac = ui.tab('Klima')
+        solar = ui.tab('Solar')
+
     with ui.tab_panels(tabs, value=light):
         with ui.tab_panel(light).classes('p-1 m-0 gap-1'):
             #with ui.grid(columns=2):
@@ -78,6 +82,64 @@ def root():
                     ui_lamp_garage_state = ui.icon('light_mode', color='gray', size='32px').classes('text-5xl')
                     ui_lamp_garage_mode = ui.toggle({1: 'auto', 2: 'on', 3: 'off'}, value=1, on_change=lambda e: light_control.set_relais_mode('garage', e.value)).props('inline')
 
+        with ui.tab_panel(wau).classes('p-1 m-0 gap-1'):
+            with ui.card():
+                ui.label("Fluffy").props('inline')
+                ui_wau_mode = ui.toggle({1: 'auto', 2: 'off', 3: 'test'}, value=1).props('inline')
+                #, on_change=lambda e: light_control.set_relais_mode('garage', e.value)).props('inline')
+            with ui.card():
+                global time_wau_on
+                global time_wau_max
+                time_wau_on = 0
+                time_wau_max = 1
+
+                def set_wau_timeout(t):
+                    now = datetime.datetime.now().time()
+                    diff = (t.hour - now.hour) * 60 + t.minute - now.minute
+                    if diff < 0:
+                        diff += 24*60
+                    if diff == 0:
+                        return
+                    global time_wau_on
+                    global time_wau_max
+                    time_wau_on = diff
+                    time_wau_max = diff
+                    wau_on_lp.set_value(1)
+
+                def wau_dec_timeout():
+                    global time_wau_on
+                    global time_wau_max
+                    if time_wau_on:
+                        time_wau_on -= 1
+                        wau_on_lp.set_value(round(time_wau_on / time_wau_max, 2))
+                    else:
+                        now = datetime.datetime.now().time()
+                        wau_silent_time.set_value(f"{now.hour:02}:{now.minute:02}")
+                        wau_on_lp.set_value(0)
+
+                ui.label("reactivate").props('inline')
+#                ui.select(options = [
+#                    '0 (off)',
+#                    '0.01 (kurz)',
+#                    '1 Stunde',
+#                    '2 Stunden',
+#                    '3 Stunden',
+#                    '5 Stunden',
+#                    '8 Stunden',
+#                    '13 Stunden',
+#                    '21 Stunden',
+#                ], with_input=True, value = '0 (off)', on_change=lambda e: set_wau_timeout(float(e.value.split(' ')[0]) * 3600)) \
+#                .classes('w-40') \
+#                .props('inline')
+                now = datetime.datetime.now().time()
+                wau_silent_time = ui.time(
+                    value=f"{now.hour:02}:{now.minute:02}",
+                    on_change=lambda e: set_wau_timeout(datetime.time.fromisoformat(e.value))
+                )
+                ui.label("remaining").props('inline')
+                wau_on_lp = ui.linear_progress(value=0).props('label-always').props('inline')
+                ui.timer(60, wau_dec_timeout)
+
         with ui.tab_panel(detector).classes('p-1 m-0 gap-1'):
             with ui.card():
                 ui.label("Melder Einfahrt").props('inline')
@@ -93,7 +155,7 @@ def root():
                 ui.button('Sonnenaufgang', on_click=lambda: light_control.sun.send_event_type(SunEventType.SUN_RISE))
                 ui.button('Sonnenuntergang', on_click=lambda: light_control.sun.send_event_type(SunEventType.SUN_SET))
 
-        with ui.tab_panel(energy).classes('p-0 m-0 gap-0'):
+        with ui.tab_panel(hvac).classes('p-0 m-0 gap-0'):
             with ui.grid(columns=2).classes('p-1 m-0 gap-1'):
                 with ui.card().classes('p-2 m-0'):
                     ui.label("Klima Arbeiten + Schlafen").props('inline')
@@ -132,6 +194,10 @@ def root():
                     ui.label("Zähler Licht")
                     ui_calib_light = ui.number(label="Licht", format='%.2f', on_change=lambda e: light_control.meters['light'].set_energy(e.value))
 
+        with ui.tab_panel(solar).classes():
+            ui.element('iframe')\
+                .props('src="http://ekrano.fritz.box:"').classes('w-[calc(78vw)] h-[calc(47vw)]')
+
             #with ui.card():
                 #columns = [
                     #{'name': 'meter', 'label': 'Zähler / kwh', 'field': 'meter', 'required': True, 'align': 'left'},
@@ -146,7 +212,7 @@ def root():
                     #{'meter': 'Mareike + Papa', 'day': 3.25, 'week': 20.31, "month": 71.45, "year": 248.34},
                     #{'meter': 'Licht', 'day': 0.25, 'week': 2.31, "month": 8.45, "year": 70.34},
                 #]
-                #ui.table(columns=columns, rows=rows, row_key='name')
+                #ui.table(columns=columns, rows=rows, row_key='name').classes('w-full justify-center')
 
 async def light_control_main():
     await light_control.io_main()
